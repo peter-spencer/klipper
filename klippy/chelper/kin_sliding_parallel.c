@@ -12,30 +12,30 @@
 #include "itersolve.h" // struct stepper_kinematics
 #include "trapq.h" // move_get_coord
 
-struct delta_stepper {
+struct sliding_parallel_stepper {
     struct stepper_kinematics sk;
     double arm2, tower_x, tower_y;
 };
 
 static double
-delta_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
+sliding_parallel_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
                             , double move_time)
 {
-    struct delta_stepper *ds = container_of(sk, struct delta_stepper, sk);
+    struct sliding_parallel_stepper *ds = container_of(sk, struct delta_stepper, sk);
     struct coord c = move_get_coord(m, move_time);
     double dx = ds->tower_x - c.x, dy = ds->tower_y - c.y;
     return sqrt(ds->arm2 - dx*dx - dy*dy) + c.z;
 }
 
 struct stepper_kinematics * __visible
-delta_stepper_alloc(double arm2, double tower_x, double tower_y)
+sliding_parallel_stepper_alloc(double arm2, double tower_x, double tower_y)
 {
-    struct delta_stepper *ds = malloc(sizeof(*ds));
+    struct sliding_parallel_stepper *ds = malloc(sizeof(*ds));
     memset(ds, 0, sizeof(*ds));
     ds->arm2 = arm2;
     ds->tower_x = tower_x;
     ds->tower_y = tower_y;
-    ds->sk.calc_position_cb = delta_stepper_calc_position;
+    ds->sk.calc_position_cb = sliding_parallel_stepper_calc_position;
     ds->sk.active_flags = AF_X | AF_Y | AF_Z;
     return &ds->sk;
 }
