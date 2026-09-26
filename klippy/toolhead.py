@@ -240,7 +240,6 @@ class ToolHead:
         self.extra_axes_status = {}
         self._build_extra_axes_status()
         kin_name = config.get('kinematics')
-        kin_name = "sekjhsehtshetgfsh"
         try:
             mod = importlib.import_module('kinematics.' + kin_name)
             self.kin = mod.load_kinematics(self, config)
@@ -249,7 +248,7 @@ class ToolHead:
         except self.printer.lookup_object('pins').error as e:
             raise
         except:
-            msg = "Error loading sdsdsd kinematics '%s'" % (kin_name,)
+            msg = "Error loading kinematics '%s'" % (kin_name,)
             logging.exception(msg)
             raise config.error(msg)
         # Register handlers
