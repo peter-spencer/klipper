@@ -72,48 +72,49 @@ class SlidingParallelKinematics:
         for s in self.get_steppers():
             s.set_trapq(toolhead.get_trapq())
 
-        # # Setup boundary checks
-        # self.need_home = True
-        # self.limit_xy2 = -1.
-        # self.home_position = tuple(
-        #     self._actuator_to_cartesian(self.abs_endstops))
-        # self.max_z = min([rail.get_homing_info().position_endstop
-        #                   for rail in self.rails])
-        # self.min_z = config.getfloat('minimum_z_position', 0, maxval=self.max_z)
-        # self.limit_z = min([ep - arm
-        #                     for ep, arm in zip(self.abs_endstops, arm_lengths)])
-        # self.min_arm_length = min_arm_length = min(arm_lengths)
-        # self.min_arm2 = min_arm_length**2
-        # logging.info(
-        #     "Delta max build height %.2fmm (radius tapered above %.2fmm)"
-        #     % (self.max_z, self.limit_z))
+        # Setup boundary checks
+        self.need_home = True
+        self.limit_xy2 = -1.
+        self.home_position = tuple(
+            self._actuator_to_cartesian(self.abs_endstops))
+        self.max_z = min([rail.get_homing_info().position_endstop
+                          for rail in self.rails])
+        self.min_z = config.getfloat('minimum_z_position', 0, maxval=self.max_z)
+        self.limit_z = min([ep - arm
+                            for ep, arm in zip(self.abs_endstops, arm_lengths)])
+        self.min_arm_length = min_arm_length = min(arm_lengths)
+        self.min_arm2 = min_arm_length**2
+        logging.info(
+            "Delta max build height %.2fmm (radius tapered above %.2fmm)"
+            % (self.max_z, self.limit_z))
         
-        # # Find the point where an XY move could result in excessive
-        # # tower movement
-        # half_min_step_dist = min([r.get_steppers()[0].get_step_dist()
-        #                           for r in self.rails]) * .5
-        # min_arm_length = min(arm_lengths)
-        # def ratio_to_xy(ratio):
-        #     return (ratio * math.sqrt(min_arm_length**2 / (ratio**2 + 1.)
-        #                               - half_min_step_dist**2)
-        #             + half_min_step_dist - radius)
-        # self.slow_xy2 = ratio_to_xy(SLOW_RATIO)**2
-        # self.very_slow_xy2 = ratio_to_xy(2. * SLOW_RATIO)**2
-        # self.max_xy2 = min(print_radius, min_arm_length - radius,
-        #                    ratio_to_xy(4. * SLOW_RATIO))**2
-        # max_xy = math.sqrt(self.max_xy2)
-        # logging.info("Delta max build radius %.2fmm (moves slowed past %.2fmm"
-        #              " and %.2fmm)"
-        #              % (max_xy, math.sqrt(self.slow_xy2),
-        #                 math.sqrt(self.very_slow_xy2)))
-        # self.axes_min = toolhead.Coord((-max_xy, -max_xy, self.min_z))
-        # self.axes_max = toolhead.Coord((max_xy, max_xy, self.max_z))
+        # Find the point where an XY move could result in excessive
+        # tower movement
+        half_min_step_dist = min([r.get_steppers()[0].get_step_dist()
+                                  for r in self.rails]) * .5
+        min_arm_length = min(arm_lengths)
+        def ratio_to_xy(ratio):
+            return (ratio * math.sqrt(min_arm_length**2 / (ratio**2 + 1.)
+                                      - half_min_step_dist**2)
+                    + half_min_step_dist - radius)
+        self.slow_xy2 = ratio_to_xy(SLOW_RATIO)**2
+        self.very_slow_xy2 = ratio_to_xy(2. * SLOW_RATIO)**2
+        self.max_xy2 = min(print_radius, min_arm_length - radius,
+                           ratio_to_xy(4. * SLOW_RATIO))**2
+        max_xy = math.sqrt(self.max_xy2)
+        logging.info("Delta max build radius %.2fmm (moves slowed past %.2fmm"
+                     " and %.2fmm)"
+                     % (max_xy, math.sqrt(self.slow_xy2),
+                        math.sqrt(self.very_slow_xy2)))
+        self.axes_min = toolhead.Coord((-max_xy, -max_xy, self.min_z))
+        self.axes_max = toolhead.Coord((max_xy, max_xy, self.max_z))
         # self.set_position([0., 0., 0.], "")
         
     def get_steppers(self):
         return [s for rail in self.rails for s in rail.get_steppers()]
     def _actuator_to_cartesian(self, spos):
-        sphere_coords = [(t[0], t[1], sp) for t, sp in zip(self.towers, spos)]
+        # sphere_coords = [(t[0], t[1], sp) for t, sp in zip(self.towers, spos)]
+        sphere_coords = [(t[0], t[1], sp) for t, sp in zip([self.towers[0],self.towers[2],self.towers[4]], [spos[0],spos[2],spos[4],])]
         return mathutil.trilateration(sphere_coords, self.arm2)
     def calc_position(self, stepper_positions):
         spos = [stepper_positions[rail.get_name()] for rail in self.rails]
