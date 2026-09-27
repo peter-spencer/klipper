@@ -70,7 +70,7 @@ class SlidingParallelKinematics:
                        for angle in self.angles]
 
         logging.info(
-                    "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees)"
+                    "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
                     % (self.angles[0],self.angles[1],self.angles[2],self.angles[3],self.angles[4],self.angles[5]))
 
         # Determine joint locations on the effector
@@ -79,7 +79,7 @@ class SlidingParallelKinematics:
         a = config.getfloat('effector_pair_spacing', 150.)               # Angle of the centre of the first pair (angle in degrees)
         b = config.getfloat('effector_pair_spacing', 120., above=0.)     # Spacing between centre of each pair (angle in degrees)
         c = config.getfloat('effector_pair_gap', 10., above=0.) * .5     # Gap between each pair (angle in degrees)
-        default_joint_angles = [ (a-c)%360.0, (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0 ]
+        default_joint_angles = [ (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0, (a-c)%360.0 ]
 
         # Now calculate the specific angles and positions of the towers
         joint_angles = [sconfig.getfloat('effector_angle', angle)
@@ -90,7 +90,7 @@ class SlidingParallelKinematics:
                         for angle in joint_angles]
 
         logging.info(
-                    "Effector joint angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees)"
+                    "Effector joint angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
                     % (joint_angles[0],joint_angles[1],joint_angles[2],joint_angles[3],joint_angles[4],joint_angles[5]))
 
 
