@@ -71,7 +71,7 @@ class SlidingParallelKinematics:
 
         logging.info(
                     "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees)"
-                    % (self.towers[0],self.towers[1],self.towers[2],self.towers[3],self.towers[4],self.towers[5]))
+                    % (self.angles[0],self.angles[1],self.angles[2],self.angles[3],self.angles[4],self.angles[5]))
 
         # Determine joint locations on the effector
         effector_radius = config.getfloat('effector_radius', above=0.)   # Radius of the circle of joints on the effector (distance in mm)
@@ -91,7 +91,7 @@ class SlidingParallelKinematics:
 
         logging.info(
                     "Effector joint angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees)"
-                    % (self.joints[0],self.joints[1],self.joints[2],self.joints[3],self.joints[4],self.joints[5]))
+                    % (joint_angles[0],joint_angles[1],joint_angles[2],joint_angles[3],joint_angles[4],joint_angles[5]))
 
 
         # Setup the iterative solver (for converting XYZ move into stepper movements)
