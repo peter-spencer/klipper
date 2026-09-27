@@ -15,25 +15,28 @@ class SlidingParallelKinematics:
         config.error("Initialising Sliding Parallel Kinematics Class.")
         # Setup tower rails
         stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
-        rail_a = stepper.LookupMultiRail(
-            stepper_configs[0], need_position_minmax = False)
-        a_endstop = rail_a.get_homing_info().position_endstop
-        rail_b = stepper.LookupMultiRail(
-            stepper_configs[1], need_position_minmax = False,
-            default_position_endstop=a_endstop)
-        rail_c = stepper.LookupMultiRail(
-            stepper_configs[2], need_position_minmax = False,
-            default_position_endstop=a_endstop)
-        rail_d = stepper.LookupMultiRail(
-            stepper_configs[3], need_position_minmax = False,
-            default_position_endstop=a_endstop)
-        rail_e = stepper.LookupMultiRail(
-            stepper_configs[4], need_position_minmax = False,
-            default_position_endstop=a_endstop)
-        rail_f = stepper.LookupMultiRail(
-            stepper_configs[5], need_position_minmax = False,
-            default_position_endstop=a_endstop)
-        self.rails = [rail_a, rail_b, rail_c,rail_d, rail_e, rail_f]
+        # rail_a = stepper.LookupMultiRail(
+        #     stepper_configs[0], need_position_minmax = False)
+        # a_endstop = rail_a.get_homing_info().position_endstop
+        # rail_b = stepper.LookupMultiRail(
+        #     stepper_configs[1], need_position_minmax = False,
+        #     default_position_endstop=a_endstop)
+        # rail_c = stepper.LookupMultiRail(
+        #     stepper_configs[2], need_position_minmax = False,
+        #     default_position_endstop=a_endstop)
+        # rail_d = stepper.LookupMultiRail(
+        #     stepper_configs[3], need_position_minmax = False,
+        #     default_position_endstop=a_endstop)
+        # rail_e = stepper.LookupMultiRail(
+        #     stepper_configs[4], need_position_minmax = False,
+        #     default_position_endstop=a_endstop)
+        # rail_f = stepper.LookupMultiRail(
+        #     stepper_configs[5], need_position_minmax = False,
+        #     default_position_endstop=a_endstop)
+        # self.rails = [rail_a, rail_b, rail_c,rail_d, rail_e, rail_f]
+        a_endstop = config.getsection('stepper_a').getfloat('position_endstop', None)
+        self.rails = [stepper.LookupMultiRail(a, need_position_minmax = False,
+            default_position_endstop=a_endstop) for a in stepper_configs]
 
         # Setup max velocity
         self.max_velocity, self.max_accel = toolhead.get_max_velocity()
