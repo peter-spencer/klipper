@@ -138,7 +138,7 @@ defs_kin_delta = """
 
 defs_kin_sliding_parallel = """
     struct stepper_kinematics *sliding_parallel_stepper_alloc(double arm2
-        , double tower_x, double tower_y);
+        , double tower_x, double tower_y, double joint_x, double joint_y, double joint_z);
 """
 
 defs_kin_deltesian = """
