@@ -251,8 +251,7 @@ class SlidingParallelKinematics:
             # new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
             a = getMatrixInverse(jacc)
             b = target_error
-            change = [a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2] for c in range(3)]
-            new_guess = current_guess - change
+            new_guess = [current_guess[c] - a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2] for c in range(3)]
 
             delta = sum(abs((current_guess-new_guess)/(current_guess+new_guess)))
 
