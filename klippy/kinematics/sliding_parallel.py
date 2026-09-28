@@ -229,9 +229,8 @@ class SlidingParallelKinematics:
 
             jacT.append([(a-b)/(2*delta[axis]) for a,b in zip(positive[::2], negative[::2])])
 
-        # jac = mathutil.mat_transp(jacT)
-        jac = jacT
-
+        jac = mathutil.mat_transp(jacT)
+        
         logging.info("Jacobian = %s" % (jac.__str__()))
 
         return jac
@@ -256,6 +255,11 @@ class SlidingParallelKinematics:
             # change = [[sum(map(operator.mul, a_i, bt_j)) for bt_j in target_error] for a_i in getMatrixInverse(jacc)]
             # new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
             a = getMatrixInverse(jacc)
+            logging.info("Inverse Jacobian = %s" % (a.__str__()))
+            
+            d = mathutil.mat_mat_mul(jacc, a)
+            logging.info("Check (should be identity matrix) = %s" % (d.__str__()))
+
             b = target_error
             new_guess = [current_guess[c] - a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2] for c in range(3)]
 
