@@ -39,12 +39,11 @@ class SlidingParallelKinematics:
         self.radius = radius = config.getfloat('delta_radius', above=0.)
         print_radius = config.getfloat('print_radius', radius, above=0.)
         arm_length_a = stepper_configs[0].getfloat('arm_length', above=radius)
-        self.arm_lengths = arm_lengths = [
-            sconfig.getfloat('arm_length', arm_length_a, above=radius)
-            for sconfig in stepper_configs]
+        self.arm_lengths = [sconfig.getfloat('arm_length', arm_length_a, above=radius)
+                            for sconfig in stepper_configs]
 
         # Store the squared length of the printer's arms to save on calculation time
-        self.arm2 = [arm**2 for arm in arm_lengths]
+        self.arm2 = [arm**2 for arm in self.arm_lengths]
         
         # Determine tower locations in cartesian space
         # First get simple or default spacings
@@ -96,10 +95,13 @@ class SlidingParallelKinematics:
         # Calculate the absolute position of each endstop. The normal endstop is the
         # height of the nozzle above the heated bed (in mm), the absolute endstop is
         # that stepper's position along its rail when homed.
-        self.abs_endstops = [(rail.get_homing_info().position_endstop
-                                + math.sqrt(arm2 - (tower[0] - joint[0])**2 - (tower[1] - joint[1])**2))
-                                + joint[2]
-                                for rail, arm2, tower, joint in zip(self.rails, self.arm2, self.towers, self.joints)]
+        # self.abs_endstops = [(rail.get_homing_info().position_endstop
+        #                         + math.sqrt(arm2 - (tower[0] - joint[0])**2 - (tower[1] - joint[1])**2))
+        #                         + joint[2]
+        #                         for rail, arm2, tower, joint in zip(self.rails, self.arm2, self.towers, self.joints)]
+        self.endstops = [rail.get_homing_info().position_endstop for rail in self.rails]
+        self.abs_endstops = [self._cartesian_to_actuator((0,0,endstop), arm2, tower, joint)
+                             for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)]
 
         logging.info(
                     "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
@@ -109,8 +111,7 @@ class SlidingParallelKinematics:
         self.need_home = True
         self.limit_xy2 = -1.
         self.home_position = tuple(self._actuator_to_cartesian(self.abs_endstops))
-        self.max_z = min([rail.get_homing_info().position_endstop
-                          for rail in self.rails])
+        self.max_z = min(self.endstops)
         self.min_z = config.getfloat('minimum_z_position', 0, maxval=self.max_z)
 
         # Calculate the highest Z where the full range of XY motion is possible.
@@ -120,15 +121,14 @@ class SlidingParallelKinematics:
         #   - The arms are not vertically downward (I think, not sure) at the limit?
         #   - Probably still a reasonable approximation for a limit - CHECK THIS!
         #   - Need calculation with effector level, and accounting for rotations?
-        self.limit_z = min([ep - arm
-                            for ep, arm in zip(self.abs_endstops, arm_lengths)])
+        self.limit_z = min([ep - arm for ep, arm in zip(self.abs_endstops, self.arm_lengths)])
         
         logging.info(
             "Hex max build height %.2fmm (radius tapered above %.2fmm)"
             % (self.max_z, self.limit_z))
         
         # Get the shortest arm's length and squared-length.
-        self.min_arm_length = min_arm_length = min(arm_lengths)
+        self.min_arm_length = min_arm_length = min(self.arm_lengths)
         self.min_arm2 = min_arm_length**2
         
         # Find the point where an XY move could result in excessive
@@ -156,22 +156,15 @@ class SlidingParallelKinematics:
         self.axes_min = toolhead.Coord((-max_xy, -max_xy, self.min_z))
         self.axes_max = toolhead.Coord((max_xy, max_xy, self.max_z))
 
-        # Complete initialisation by zeroing the printer position
-        self.set_position([0., 0., 0.], "")
+        # Why was this here? What did it do?
+        # self.set_position([0., 0., 0.], "")
+
+        self.get_jacobian((0,0,(self.max_z-self.min_z)/2.))
 
 
-        
+    # Get the stepper motor positions    
     def get_steppers(self):
         return [s for rail in self.rails for s in rail.get_steppers()]
-
-    # Forward kinematics (work out XYZ position from the stepper positions, requires numeric solution)
-    def _actuator_to_cartesian(self, spos):
-        # sphere_coords = [(t[0], t[1], sp) for t, sp in zip(self.towers, spos)]
-        sphere_coords = [(t[0], t[1], sp) for t, sp in zip([self.towers[0],self.towers[2],self.towers[4]], [spos[0],spos[2],spos[4],])]
-        return mathutil.trilateration(sphere_coords, self.arm2)
-    def calc_position(self, stepper_positions):
-        spos = [stepper_positions[rail.get_name()] for rail in self.rails]
-        return self._actuator_to_cartesian(spos)
 
     # Set the stepper motor positions
     def set_position(self, newpos, homing_axes):
@@ -180,6 +173,65 @@ class SlidingParallelKinematics:
         self.limit_xy2 = -1.
         if homing_axes == "xyz":
             self.need_home = False
+
+
+    ######  Inverse Kinematics  ######
+
+    # Return a stepper position for the given coordinates, arm length,
+    # tower position, and joint position at the specified coordinates
+    def _cartesian_to_actuator(self, coordinates, arm2, tower, joint):
+        # 2D position without orientation
+        tx, ty = tower
+
+        # 3D positions without orientation
+        x, y, z = coordinates
+        jx, jy, jz = joint
+
+        return math.sqrt(arm2 - (tx - jx - x)**2 
+                              - (ty - jy - y)**2) + jz + z
+
+    # Return a list of stepper positions for the given effector coordinates
+    def calc_actuator(self, coordinates):
+        return [self._cartesian_to_actuator(coordinates, arm2, tower, joint)
+                for arm2, tower, joint in zip(self.arm2, self.towers, self.joints)]
+
+    ######  Forward Kinematics  ######
+
+    # Forward kinematics (work out XYZ position from the stepper positions, requires numeric solution)
+    def _actuator_to_cartesian(self, spos):
+        # sphere_coords = [(t[0], t[1], sp) for t, sp in zip(self.towers, spos)]
+        sphere_coords = [(t[0], t[1], sp) for t, sp in zip([self.towers[0],self.towers[2],self.towers[4]], [spos[0],spos[2],spos[4],])]
+        return mathutil.trilateration(sphere_coords, self.arm2)
+    
+    def calc_position(self, stepper_positions):
+        spos = [stepper_positions[rail.get_name()] for rail in self.rails]
+        return self._actuator_to_cartesian(spos)
+
+##########################
+
+    # Get the Jacobian matrix for change in stepper positions as a function of effector coordinates
+    def get_jacobian(self, coordinates):
+        new_coordinates = list(coordinates)
+        
+        # Declare the matrix for the result
+        jacT = []
+
+        # XYZ translations only
+        for axis in range(3):
+            delta = [0,0,0]
+            delta[axis] = 0.001                                 # Shift by +/- 1 micron
+
+            jacT.append((self.calc_actuator(new_coordinates+delta)
+                         - self.calc_actuator(new_coordinates-delta)) / (2*delta[axis]))
+
+        jac = mathutil.mat_transp(jacT)
+
+        logging.info("Jacobian = %s" % (jac.__str__()))
+
+        return jac
+
+##########################
+
 
     # Homing the printer
     def clear_homing_state(self, clear_axes):
@@ -193,6 +245,7 @@ class SlidingParallelKinematics:
         forcepos = list(self.home_position)
         forcepos[2] = -1.5 * math.sqrt(max(self.arm2)-self.max_xy2)
         homing_state.home_rails(self.rails, forcepos, self.home_position)
+
 
     # Check that a proposed move will be possible
     def check_move(self, move):
@@ -233,6 +286,7 @@ class SlidingParallelKinematics:
             limit_xy2 = -1.
         self.limit_xy2 = min(limit_xy2, self.slow_xy2)
 
+
     # Return status information
     def get_status(self, eventtime):
         return {
@@ -250,6 +304,7 @@ class SlidingParallelKinematics:
                      for rail in self.rails]
         return SlidingParallelCalibration(self.radius, self.angles, self.arm_lengths,
                                 endstops, stepdists)
+
 
 # Delta parameter calibration for DELTA_CALIBRATE tool
 class SlidingParallelCalibration:
