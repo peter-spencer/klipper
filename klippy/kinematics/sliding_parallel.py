@@ -101,6 +101,10 @@ class SlidingParallelKinematics:
                                 + joint[2]
                                 for rail, arm2, tower, joint in zip(self.rails, self.arm2, self.towers, self.joints)]
 
+        logging.info(
+                    "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
+                    % (self.abs_endstops[0],self.abs_endstops[1],self.abs_endstops[2],self.abs_endstops[3],self.abs_endstops[4],self.abs_endstops[5]))
+
         # Setup boundary checks
         self.need_home = True
         self.limit_xy2 = -1.
