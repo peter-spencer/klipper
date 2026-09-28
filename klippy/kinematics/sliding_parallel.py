@@ -227,7 +227,7 @@ class SlidingParallelKinematics:
             positive = self.calc_actuator([a+b for a,b in zip(new_coordinates, delta)])
             negative = self.calc_actuator([a-b for a,b in zip(new_coordinates, delta)])
 
-            jacT.append([(a-b)/(2*delta[axis]) for a,b in zip(positive, negative)])
+            jacT.append([(a-b)/(2*delta[axis]) for a,b in zip(positive[::2], negative[::2])])
 
         jac = mathutil.mat_transp(jacT)
 
@@ -244,8 +244,8 @@ class SlidingParallelKinematics:
         for q in range(max_iterations):
             jacc = self.get_jacobian(current_guess)
 
-            legs_current = self.calc_actuator(current_guess)
-            target_error = [a-b for a,b in zip(legs_current, spos)]
+            legs_current = self.calc_actuator(current_guess)[::2]
+            target_error = [a-b for a,b in zip(legs_current, spos[::2])]
 
             new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
 
