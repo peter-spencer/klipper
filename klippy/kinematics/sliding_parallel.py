@@ -15,28 +15,17 @@ class SlidingParallelKinematics:
         config.error("Initialising Sliding Parallel Kinematics Class.")
         # Setup tower rails
         stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
-        # rail_a = stepper.LookupMultiRail(
-        #     stepper_configs[0], need_position_minmax = False)
-        # a_endstop = rail_a.get_homing_info().position_endstop
-        # rail_b = stepper.LookupMultiRail(
-        #     stepper_configs[1], need_position_minmax = False,
-        #     default_position_endstop=a_endstop)
-        # rail_c = stepper.LookupMultiRail(
-        #     stepper_configs[2], need_position_minmax = False,
-        #     default_position_endstop=a_endstop)
-        # rail_d = stepper.LookupMultiRail(
-        #     stepper_configs[3], need_position_minmax = False,
-        #     default_position_endstop=a_endstop)
-        # rail_e = stepper.LookupMultiRail(
-        #     stepper_configs[4], need_position_minmax = False,
-        #     default_position_endstop=a_endstop)
-        # rail_f = stepper.LookupMultiRail(
-        #     stepper_configs[5], need_position_minmax = False,
-        #     default_position_endstop=a_endstop)
-        # self.rails = [rail_a, rail_b, rail_c,rail_d, rail_e, rail_f]
-        a_endstop = config.getsection('stepper_a').getfloat('position_endstop', None)
-        self.rails = [stepper.LookupMultiRail(a, need_position_minmax = False,
-            default_position_endstop=a_endstop) for a in stepper_configs]
+
+        # Load the first rail, stepper_a
+        rail_a = stepper.LookupMultiRail(stepper_configs[0], need_position_minmax = False)
+
+        # There must be an endstop specified for at least this first rail,
+        # this will be the default endstop for the other rails.
+        default_endstop = rail_a.get_homing_info().position_endstop
+
+        # Load the rest of the rails
+        self.rails = [rail_a] + [stepper.LookupMultiRail(stepper_config, need_position_minmax = False,
+            default_position_endstop=default_endstop) for stepper_config in stepper_configs[1:]]
 
         # Setup max velocity
         self.max_velocity, self.max_accel = toolhead.get_max_velocity()
@@ -53,10 +42,9 @@ class SlidingParallelKinematics:
         self.arm_lengths = arm_lengths = [
             sconfig.getfloat('arm_length', arm_length_a, above=radius)
             for sconfig in stepper_configs]
+
+        # Store the squared length of the printer's arms to save on calculation time
         self.arm2 = [arm**2 for arm in arm_lengths]
-        self.abs_endstops = [(rail.get_homing_info().position_endstop
-                                + math.sqrt(arm2 - radius**2))
-                                for rail, arm2 in zip(self.rails, self.arm2)]
         
         # Determine tower locations in cartesian space
         # First get simple or default spacings
@@ -105,46 +93,66 @@ class SlidingParallelKinematics:
         for s in self.get_steppers():
             s.set_trapq(toolhead.get_trapq())
 
+        # Calculate the absolute position of each endstop. The normal endstop is the
+        # height of the nozzle above the heated bed (in mm), the absolute endstop is
+        # that stepper's position along its rail when homed.
+        self.abs_endstops = [(rail.get_homing_info().position_endstop
+                                + math.sqrt(arm2 - (tower[0] - joint[0])**2 - (tower[1] - joint[1])**2))
+                                + joint[2]
+                                for rail, arm2, tower, joint in zip(self.rails, self.arm2, self.towers, self.joints)]
+
         # Setup boundary checks
         self.need_home = True
         self.limit_xy2 = -1.
-        self.home_position = tuple(
-            self._actuator_to_cartesian(self.abs_endstops))
+        self.home_position = tuple(self._actuator_to_cartesian(self.abs_endstops))
         self.max_z = min([rail.get_homing_info().position_endstop
                           for rail in self.rails])
         self.min_z = config.getfloat('minimum_z_position', 0, maxval=self.max_z)
+
+        # Calculate the highest Z where the full range of XY motion is possible.
+        # In a linear delta design, this is when the steppers are at the top of
+        # their range, and an arm is directly downwards.
+        # For the Gough/Stewart/Hexapod robot, it is a bit more complex:
+        #   - The arms are not vertically downward (I think, not sure) at the limit?
+        #   - Probably still a reasonable approximation for a limit - CHECK THIS!
+        #   - Need calculation with effector level, and accounting for rotations?
         self.limit_z = min([ep - arm
                             for ep, arm in zip(self.abs_endstops, arm_lengths)])
+        
+        logging.info(
+            "Hex max build height %.2fmm (radius tapered above %.2fmm)"
+            % (self.max_z, self.limit_z))
+        
+        # Get the shortest arm's length and squared-length.
         self.min_arm_length = min_arm_length = min(arm_lengths)
         self.min_arm2 = min_arm_length**2
-        logging.info(
-            "Delta max build height %.2fmm (radius tapered above %.2fmm)"
-            % (self.max_z, self.limit_z))
         
         # Find the point where an XY move could result in excessive
         # tower movement
         half_min_step_dist = min([r.get_steppers()[0].get_step_dist()
                                   for r in self.rails]) * .5
-        min_arm_length = min(arm_lengths)
+
         def ratio_to_xy(ratio):
             return (ratio * math.sqrt(min_arm_length**2 / (ratio**2 + 1.)
                                       - half_min_step_dist**2)
                     + half_min_step_dist - radius)
+
         self.slow_xy2 = ratio_to_xy(SLOW_RATIO)**2
         self.very_slow_xy2 = ratio_to_xy(2. * SLOW_RATIO)**2
         self.max_xy2 = min(print_radius, min_arm_length - radius,
                            ratio_to_xy(4. * SLOW_RATIO))**2
         max_xy = math.sqrt(self.max_xy2)
-        logging.info("Delta max build radius %.2fmm (moves slowed past %.2fmm"
+
+        logging.info("Hex max build radius %.2fmm (moves slowed past %.2fmm"
                      " and %.2fmm)"
                      % (max_xy, math.sqrt(self.slow_xy2),
                         math.sqrt(self.very_slow_xy2)))
 
-        # Set minium and maximum axes positions
+        # Set minium and maximum axes positions to define allowed build volume
         self.axes_min = toolhead.Coord((-max_xy, -max_xy, self.min_z))
         self.axes_max = toolhead.Coord((max_xy, max_xy, self.max_z))
 
-        # Zero the printer position
+        # Complete initialisation by zeroing the printer position
         self.set_position([0., 0., 0.], "")
 
 
