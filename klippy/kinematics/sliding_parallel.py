@@ -229,7 +229,8 @@ class SlidingParallelKinematics:
 
             jacT.append([(a-b)/(2*delta[axis]) for a,b in zip(positive[::2], negative[::2])])
 
-        jac = mathutil.mat_transp(jacT)
+        # jac = mathutil.mat_transp(jacT)
+        jac = jacT
 
         logging.info("Jacobian = %s" % (jac.__str__()))
 
@@ -238,6 +239,9 @@ class SlidingParallelKinematics:
     def _actuator_to_cartesian(self, spos):
         max_iterations = 100
         convergence = 1e-10
+
+        logging.info("Forward Kinematics starting, solving for stepper positions (%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) mm..."
+                      % (spos[0],spos[1],spos[2],spos[3],spos[4],spos[5]))
 
         current_guess = [0., 0., (self.max_z-self.min_z)/2.]
 
@@ -260,6 +264,7 @@ class SlidingParallelKinematics:
             current_guess = new_guess
 
             if delta <= convergence:
+                logging.info("Convergence criterion achieved: %g < %g" % (delta, convergence))
                 break
 
         return current_guess
