@@ -211,18 +211,19 @@ class SlidingParallelKinematics:
 
     # Get the Jacobian matrix for change in stepper positions as a function of effector coordinates
     def get_jacobian(self, coordinates):
-        new_coordinates = list(coordinates)
+        pos = list(coordinates)
         
         # Declare the matrix for the result
         jacT = []
 
         # XYZ translations only
         for axis in range(3):
-            delta = [0,0,0]
-            delta[axis] = 0.001                                 # Shift by +/- 1 micron
+            dpos = [0,0,0]
+            dpos[axis] = 0.001                                 # Shift by +/- 1 micron
 
-            jacT.append((self.calc_actuator(new_coordinates+delta)
-                         - self.calc_actuator(new_coordinates-delta)) / (2*delta[axis]))
+            jacT.append((self.calc_actuator((pos[0]+dpos[0],pos[1]+dpos[1],pos[2]+dpos[2]))
+                         - self.calc_actuator((pos[0]-dpos[0],pos[1]-dpos[1],pos[2]-dpos[2])))
+                         / (2*dpos[axis]))
 
         jac = mathutil.mat_transp(jacT)
 
