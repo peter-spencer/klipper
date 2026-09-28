@@ -413,7 +413,7 @@ def load_kinematics(toolhead, config):
 ################################
 
 def transposeMatrix(m):
-    return map(list,zip(*m))
+    return list(map(list,zip(*m)))
 
 def getMatrixMinor(m,i,j):
     return [row[:j] + row[j+1:] for row in (m[:i]+m[i+1:])]
