@@ -223,8 +223,8 @@ class SlidingParallelKinematics:
             delta = [0,0,0]
             delta[axis] = delta_position
 
-            positive = self.calc_actuator((a+b for a,b in zip(new_coordinates, delta)))
-            negative = self.calc_actuator((a-b for a,b in zip(new_coordinates, delta)))
+            positive = self.calc_actuator([a+b for a,b in zip(new_coordinates, delta)])
+            negative = self.calc_actuator([a-b for a,b in zip(new_coordinates, delta)])
 
             jacT.append([(a-b)/(2*delta[axis]) for a,b in zip(positive, negative)])
 
