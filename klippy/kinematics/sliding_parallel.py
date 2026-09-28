@@ -159,7 +159,8 @@ class SlidingParallelKinematics:
         # Why was this here? What did it do?
         # self.set_position([0., 0., 0.], "")
 
-        self.get_jacobian((0,0,(self.max_z-self.min_z)/2.))
+        # Just for testing
+        # self.get_jacobian((0,0,(self.max_z-self.min_z)/2.))
 
 
     # Get the stepper motor positions    
@@ -197,11 +198,11 @@ class SlidingParallelKinematics:
 
     ######  Forward Kinematics  ######
 
-    # Forward kinematics (work out XYZ position from the stepper positions, requires numeric solution)
-    def _actuator_to_cartesian(self, spos):
-        # sphere_coords = [(t[0], t[1], sp) for t, sp in zip(self.towers, spos)]
-        sphere_coords = [(t[0], t[1], sp) for t, sp in zip([self.towers[0],self.towers[2],self.towers[4]], [spos[0],spos[2],spos[4],])]
-        return mathutil.trilateration(sphere_coords, self.arm2)
+    # # Forward kinematics (work out XYZ position from the stepper positions, requires numeric solution)
+    # def _actuator_to_cartesian(self, spos):
+    #     # sphere_coords = [(t[0], t[1], sp) for t, sp in zip(self.towers, spos)]
+    #     sphere_coords = [(t[0], t[1], sp) for t, sp in zip([self.towers[0],self.towers[2],self.towers[4]], [spos[0],spos[2],spos[4],])]
+    #     return mathutil.trilateration(sphere_coords, self.arm2)
     
     def calc_position(self, stepper_positions):
         spos = [stepper_positions[rail.get_name()] for rail in self.rails]
@@ -233,6 +234,29 @@ class SlidingParallelKinematics:
         logging.info("Jacobian = %s" % (jac.__str__()))
 
         return jac
+
+    def _actuator_to_cartesian(self, spos):
+        max_iterations = 100
+        convergence = 1e-10
+
+        current_guess = [0., 0., (self.max_z-self.min_z)/2.]
+
+        for q in range(max_iterations):
+            jacc = self.get_jacobian(current_guess)
+
+            legs_current = self.calc_actuator(current_guess)
+            target_error = [a-b for a,b in zip(legs_current, spos)]
+
+            new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
+
+            delta = sum(abs((current_guess-new_guess)/(current_guess+new_guess)))
+
+            current_guess = new_guess
+
+            if delta <= convergence:
+                break
+
+        return current_guess
 
 ##########################
 
@@ -384,3 +408,43 @@ class SlidingParallelCalibration:
 
 def load_kinematics(toolhead, config):
     return SlidingParallelKinematics(toolhead, config)
+
+
+################################
+
+def transposeMatrix(m):
+    return map(list,zip(*m))
+
+def getMatrixMinor(m,i,j):
+    return [row[:j] + row[j+1:] for row in (m[:i]+m[i+1:])]
+
+def getMatrixDeternminant(m):
+    #base case for 2x2 matrix
+    if len(m) == 2:
+        return m[0][0]*m[1][1]-m[0][1]*m[1][0]
+
+    determinant = 0
+    for c in range(len(m)):
+        determinant += ((-1)**c)*m[0][c]*getMatrixDeternminant(getMatrixMinor(m,0,c))
+    return determinant
+
+def getMatrixInverse(m):
+    determinant = getMatrixDeternminant(m)
+    #special case for 2x2 matrix:
+    if len(m) == 2:
+        return [[m[1][1]/determinant, -1*m[0][1]/determinant],
+                [-1*m[1][0]/determinant, m[0][0]/determinant]]
+
+    #find matrix of cofactors
+    cofactors = []
+    for r in range(len(m)):
+        cofactorRow = []
+        for c in range(len(m)):
+            minor = getMatrixMinor(m,r,c)
+            cofactorRow.append(((-1)**(r+c)) * getMatrixDeternminant(minor))
+        cofactors.append(cofactorRow)
+    cofactors = transposeMatrix(cofactors)
+    for r in range(len(cofactors)):
+        for c in range(len(cofactors)):
+            cofactors[r][c] = cofactors[r][c]/determinant
+    return cofactors
