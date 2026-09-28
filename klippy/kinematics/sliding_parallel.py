@@ -110,9 +110,9 @@ class SlidingParallelKinematics:
         # Setup boundary checks
         self.need_home = True
         self.limit_xy2 = -1.
-        self.home_position = tuple(self._actuator_to_cartesian(self.abs_endstops))
         self.max_z = min(self.endstops)
         self.min_z = config.getfloat('minimum_z_position', 0, maxval=self.max_z)
+        self.home_position = tuple(self._actuator_to_cartesian(self.abs_endstops))
 
         # Calculate the highest Z where the full range of XY motion is possible.
         # In a linear delta design, this is when the steppers are at the top of
