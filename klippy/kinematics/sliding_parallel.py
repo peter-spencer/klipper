@@ -4,7 +4,7 @@
 # Initially derived from delta.py by Kevin O'Connor
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import math, logging
+import operator, math, logging
 import stepper, mathutil
 
 # Slow moves once the ratio of tower to XY movement exceeds SLOW_RATIO
@@ -247,7 +247,9 @@ class SlidingParallelKinematics:
             legs_current = self.calc_actuator(current_guess)[::2]
             target_error = [a-b for a,b in zip(legs_current, spos[::2])]
 
-            new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
+            change = [[sum(map(operator.mul, a_i, bt_j)) for bt_j in transposeMatrix(target_error)] for a_i in getMatrixInverse(jacc)]
+            # new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
+            new_guess = current_guess - change
 
             delta = sum(abs((current_guess-new_guess)/(current_guess+new_guess)))
 
