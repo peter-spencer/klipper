@@ -242,6 +242,8 @@ class SlidingParallelKinematics:
         current_guess = [0., 0., (self.max_z-self.min_z)/2.]
 
         for q in range(max_iterations):
+            logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm" % (q,current_guess[0],current_guess[1],current_guess[2]))
+
             jacc = self.get_jacobian(current_guess)
 
             legs_current = self.calc_actuator(current_guess)[::2]
