@@ -268,10 +268,10 @@ class HexapodKinematics:
             target_error = legs_current - spos[::2]
             logging.info("Positional error = (%.3f,%.3f,%.3f) mm" % (target_error[0],target_error[1],target_error[2]))
 
-            a = scipy.linalg.inv(jacc)
+            a = np.linalg.inv(jacc)
             logging.info("Inverse Jacobian = %s" % (a.__str__()))
 
-            d = a * jacc
+            d = np.dot(a,jacc)
             logging.info("Check (should be identity matrix) = %s" % (d.__str__()))
 
             b = target_error
