@@ -253,6 +253,8 @@ class SlidingParallelKinematics:
             legs_current = self.calc_actuator(current_guess)[::2]
             target_error = [a-b for a,b in zip(legs_current, spos[::2])]
 
+            logging.info("Positional error = (%.3f,%.3f,%.3f) mm" % (q,target_error[0],target_error[1],target_error[2]))
+
             # change = [[sum(map(operator.mul, a_i, bt_j)) for bt_j in target_error] for a_i in getMatrixInverse(jacc)]
             # new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
             a = getMatrixInverse(jacc)
