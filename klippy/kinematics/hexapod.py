@@ -15,12 +15,26 @@
 import operator, math, logging
 import stepper, mathutil
 
+# delay import until configuration time
+np = None
+scipy = None
+
 # Slow moves once the ratio of tower to XY movement exceeds SLOW_RATIO
 SLOW_RATIO = 3.
 
-class SlidingParallelKinematics:
+class HexapodKinematics:
     def __init__(self, toolhead, config):
-        config.error("Initialising Sliding Parallel Kinematics Class.")
+        try:
+            global np
+            import numpy as np
+        except:
+            raise config.error("Hexapod kinematics requires the NumPy module")
+        try:
+            global scipy
+            import scipy
+        except:
+            raise config.error("Hexapod kinematics requires the SciPy module")
+
         # Setup tower rails
         stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
 
@@ -32,8 +46,8 @@ class SlidingParallelKinematics:
         default_endstop = rail_a.get_homing_info().position_endstop
 
         # Load the rest of the rails
-        self.rails = [rail_a] + [stepper.LookupMultiRail(stepper_config, need_position_minmax = False,
-            default_position_endstop=default_endstop) for stepper_config in stepper_configs[1:]]
+        self.rails = np.array([rail_a] + [stepper.LookupMultiRail(stepper_config, need_position_minmax = False,
+            default_position_endstop=default_endstop) for stepper_config in stepper_configs[1:]])
 
         # Setup max velocity
         self.max_velocity, self.max_accel = toolhead.get_max_velocity()
@@ -47,11 +61,11 @@ class SlidingParallelKinematics:
         self.radius = radius = config.getfloat('delta_radius', above=0.)
         print_radius = config.getfloat('print_radius', radius, above=0.)
         arm_length_a = stepper_configs[0].getfloat('arm_length', above=radius)
-        self.arm_lengths = [sconfig.getfloat('arm_length', arm_length_a, above=radius)
-                            for sconfig in stepper_configs]
+        self.arm_lengths = np.array([sconfig.getfloat('arm_length', arm_length_a, above=radius)
+                            for sconfig in stepper_configs])
 
         # Store the squared length of the printer's arms to save on calculation time
-        self.arm2 = [arm**2 for arm in self.arm_lengths]
+        self.arm2 = np.square(self.arm_lengths)
         
         # Determine tower locations in cartesian space
         # First get simple or default spacings
@@ -61,11 +75,11 @@ class SlidingParallelKinematics:
         default_tower_angles = [ (a-c)%360.0, (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0 ]
 
         # Now calculate the specific angles and positions of the towers
-        self.angles = [sconfig.getfloat('angle', angle)
-                       for sconfig, angle in zip(stepper_configs, default_tower_angles)]
-        self.towers = [(math.cos(math.radians(angle)) * radius,
+        self.angles = np.array([sconfig.getfloat('angle', angle)
+                       for sconfig, angle in zip(stepper_configs, default_tower_angles)])
+        self.towers = np.array([(math.cos(math.radians(angle)) * radius,
                         math.sin(math.radians(angle)) * radius)
-                       for angle in self.angles]
+                       for angle in self.angles])
 
         logging.info(
                     "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
@@ -80,12 +94,12 @@ class SlidingParallelKinematics:
         default_joint_angles = [ (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0, (a-c)%360.0 ]
 
         # Now calculate the specific angles and positions of the towers
-        joint_angles = [sconfig.getfloat('effector_angle', angle)
-                        for sconfig, angle in zip(stepper_configs, default_joint_angles)]
-        self.joints = [(math.cos(math.radians(angle)) * effector_radius,
+        joint_angles = np.array([sconfig.getfloat('effector_angle', angle)
+                        for sconfig, angle in zip(stepper_configs, default_joint_angles)])
+        self.joints = np.array([(math.cos(math.radians(angle)) * effector_radius,
                         math.sin(math.radians(angle)) * effector_radius,
                         effector_z)
-                        for angle in joint_angles]
+                        for angle in joint_angles])
 
         logging.info(
                     "Effector joint angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
@@ -103,9 +117,9 @@ class SlidingParallelKinematics:
         # Calculate the absolute position of each endstop. The normal endstop is the
         # height of the nozzle above the heated bed (in mm), the absolute endstop is
         # that stepper's position along its rail when homed.
-        self.endstops = [rail.get_homing_info().position_endstop for rail in self.rails]
-        self.abs_endstops = [self._cartesian_to_actuator((0,0,endstop), arm2, tower, joint)
-                             for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)]
+        self.endstops = np.array([rail.get_homing_info().position_endstop for rail in self.rails])
+        self.abs_endstops = np.array([self._cartesian_to_actuator((0,0,endstop), arm2, tower, joint)
+                             for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)])
 
         logging.info(
                     "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
@@ -166,7 +180,7 @@ class SlidingParallelKinematics:
 
     # Get the stepper motor positions    
     def get_steppers(self):
-        return [s for rail in self.rails for s in rail.get_steppers()]
+        return np.array([s for rail in self.rails for s in rail.get_steppers()])
 
     # Set the stepper motor positions
     def set_position(self, newpos, homing_axes):
@@ -194,36 +208,37 @@ class SlidingParallelKinematics:
 
     # Return a list of stepper positions for the given effector coordinates
     def calc_actuator(self, coordinates):
-        return [self._cartesian_to_actuator(coordinates, arm2, tower, joint)
-                for arm2, tower, joint in zip(self.arm2, self.towers, self.joints)]
+        return np.array([self._cartesian_to_actuator(coordinates, arm2, tower, joint)
+                for arm2, tower, joint in zip(self.arm2, self.towers, self.joints)])
 
     ######  Forward Kinematics  ######
     
     # Calculate the cartesian (X,Y,Z) position of the effector from the positions of the stepper motors
     def calc_position(self, stepper_positions):
-        spos = [stepper_positions[rail.get_name()] for rail in self.rails]
+        spos = np.array([stepper_positions[rail.get_name()] for rail in self.rails])
         return self._actuator_to_cartesian(spos)
 
     # Get the Jacobian matrix for change in stepper positions as a function of effector coordinates
     # Coordinates is a list or tuple of 3 floats for X,Y,Z coordinates and delta_position is half
     # of the amount of displacement for calculating the derivatives.
     def get_jacobian(self, coordinates, delta_position = 0.001):
-        new_coordinates = list(coordinates)
-        
+                
         # Declare the matrix for the result
-        jacT = []
+        jacT = np.ones(shape=(3,3))
 
         # XYZ translations only
         for axis in range(3):
             delta = [0,0,0]
             delta[axis] = delta_position
 
-            positive = self.calc_actuator([a+b for a,b in zip(new_coordinates, delta)])
-            negative = self.calc_actuator([a-b for a,b in zip(new_coordinates, delta)])
+            # positive = self.calc_actuator([a+b for a,b in zip(new_coordinates, delta)])
+            # negative = self.calc_actuator([a-b for a,b in zip(new_coordinates, delta)])
+            positive = self.calc_actuator(coordinates + delta)
+            negative = self.calc_actuator(coordinates - delta)
 
-            jacT.append([(a-b)/(2*delta[axis]) for a,b in zip(positive[::2], negative[::2])])
+            jacT[axis,:] = (positive-negative) / (2*delta[axis])
 
-        jac = mathutil.mat_transp(jacT)
+        jac = jacT.T
         
         logging.info("Jacobian = %s" % (jac.__str__()))
 
@@ -237,31 +252,34 @@ class SlidingParallelKinematics:
                       % (spos[0],spos[1],spos[2],spos[3],spos[4],spos[5]))
 
         if initial_guess is None:
-            current_guess = [0., 0., (self.max_z-self.min_z)/2.]
+            current_guess = np.array([0., 0., (self.max_z-self.min_z)/2.])
         else:
-            current_guess = initial_guess.copy()
+            current_guess = np.array(initial_guess)
 
         for q in range(max_iterations):
             logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm" % (q,current_guess[0],current_guess[1],current_guess[2]))
 
             jacc = self.get_jacobian(current_guess)
 
-            legs_current = self.calc_actuator(current_guess)[::2]
+            legs_current = np.array(self.calc_actuator(current_guess)[::2])
             logging.info("Current guess stepper positions = %.3f, %.3f, %.3f" % (legs_current[0],legs_current[1],legs_current[2]))
 
-            target_error = [a-b for a,b in zip(legs_current, spos[::2])]
+            # target_error = [a-b for a,b in zip(legs_current, spos[::2])]
+            target_error = legs_current - spos[::2]
             logging.info("Positional error = (%.3f,%.3f,%.3f) mm" % (target_error[0],target_error[1],target_error[2]))
 
-            a = getMatrixInverse(jacc)
+            a = scipy.linalg.inv(jacc)
             logging.info("Inverse Jacobian = %s" % (a.__str__()))
 
-            d = mathutil.mat_mat_mul(jacc, a)
+            d = jacc * a
             logging.info("Check (should be identity matrix) = %s" % (d.__str__()))
 
             b = target_error
-            new_guess = [current_guess[c] - (a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2]) for c in range(3)]
+            # new_guess = [current_guess[c] - (a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2]) for c in range(3)]
+            new_guess = current_guess - a * b
 
-            delta = sum([abs((current_guess[c]-new_guess[c])/(current_guess[c]+new_guess[c])) for c in range(3)])
+            # delta = sum([abs((current_guess[c]-new_guess[c])/(current_guess[c]+new_guess[c])) for c in range(3)])
+            delta = np.sum(np.abs((current_guess-new_guess)/(current_guess+new_guess)))
 
             current_guess = new_guess
 
@@ -347,12 +365,12 @@ class SlidingParallelKinematics:
     # Get the printer calibration
     def get_calibration(self):
         stepdists = [rail.get_steppers()[0].get_step_dist() for rail in self.rails]
-        return SlidingParallelCalibration(self.radius, self.angles, self.arm_lengths,
+        return HexapodCalibration(self.radius, self.angles, self.arm_lengths,
                                 self.endstops, stepdists)
 
 
 # Delta parameter calibration for DELTA_CALIBRATE tool
-class SlidingParallelCalibration:
+class HexapodCalibration:
     def __init__(self, radius, angles, arms, endstops, stepdists):
         self.radius = radius
         self.angles = angles
@@ -387,7 +405,7 @@ class SlidingParallelCalibration:
         arms = [params['arm_'+a] for a in 'abc']
         endstops = [params['endstop_'+a] for a in 'abc']
         stepdists = [params['stepdist_'+a] for a in 'abc']
-        return SlidingParallelCalibration(radius, angles, arms, endstops, stepdists)
+        return HexapodCalibration(radius, angles, arms, endstops, stepdists)
     def get_position_from_stable(self, stable_position):
         # Return cartesian coordinates for the given stable_position
         sphere_coords = [
@@ -424,46 +442,5 @@ class SlidingParallelCalibration:
                self.radius))
 
 def load_kinematics(toolhead, config):
-    return SlidingParallelKinematics(toolhead, config)
+    return HexapodKinematics(toolhead, config)
 
-
-###########################################################
-# Helper functions for matrix inverse from Stack Exchange #
-###########################################################
-
-def transposeMatrix(m):
-    return list(map(list,zip(*m)))
-
-def getMatrixMinor(m,i,j):
-    return [row[:j] + row[j+1:] for row in (m[:i]+m[i+1:])]
-
-def getMatrixDeternminant(m):
-    #base case for 2x2 matrix
-    if len(m) == 2:
-        return m[0][0]*m[1][1]-m[0][1]*m[1][0]
-
-    determinant = 0
-    for c in range(len(m)):
-        determinant += ((-1)**c)*m[0][c]*getMatrixDeternminant(getMatrixMinor(m,0,c))
-    return determinant
-
-def getMatrixInverse(m):
-    determinant = getMatrixDeternminant(m)
-    #special case for 2x2 matrix:
-    if len(m) == 2:
-        return [[m[1][1]/determinant, -1*m[0][1]/determinant],
-                [-1*m[1][0]/determinant, m[0][0]/determinant]]
-
-    #find matrix of cofactors
-    cofactors = []
-    for r in range(len(m)):
-        cofactorRow = []
-        for c in range(len(m)):
-            minor = getMatrixMinor(m,r,c)
-            cofactorRow.append(((-1)**(r+c)) * getMatrixDeternminant(minor))
-        cofactors.append(cofactorRow)
-    cofactors = transposeMatrix(cofactors)
-    for r in range(len(cofactors)):
-        for c in range(len(cofactors)):
-            cofactors[r][c] = cofactors[r][c]/determinant
-    return cofactors

@@ -13,16 +13,16 @@
 #include "itersolve.h" // struct stepper_kinematics
 #include "trapq.h" // move_get_coord
 
-struct sliding_parallel_stepper {
+struct hexapod_stepper {
     struct stepper_kinematics sk;
     double arm2, tower_x, tower_y, joint_x, joint_y, joint_z;
 };
 
 static double
-sliding_parallel_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
+hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
                             , double move_time)
 {
-    struct sliding_parallel_stepper *ds = container_of(sk, struct sliding_parallel_stepper, sk);
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
     struct coord c = move_get_coord(m, move_time);
 
     double dx = ds->tower_x - (c.x + ds->joint_x);
@@ -33,7 +33,7 @@ sliding_parallel_stepper_calc_position(struct stepper_kinematics *sk, struct mov
 }
 
 struct stepper_kinematics * __visible
-sliding_parallel_stepper_alloc(double arm2, double tower_x, double tower_y, double joint_x, double joint_y, double joint_z)
+hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double joint_x, double joint_y, double joint_z)
 {
     struct sliding_parallel_stepper *ds = malloc(sizeof(*ds));
     memset(ds, 0, sizeof(*ds));
@@ -43,7 +43,7 @@ sliding_parallel_stepper_alloc(double arm2, double tower_x, double tower_y, doub
     ds->joint_x = joint_x;
     ds->joint_y = joint_y;
     ds->joint_z = joint_z;
-    ds->sk.calc_position_cb = sliding_parallel_stepper_calc_position;
+    ds->sk.calc_position_cb = hexapod_stepper_calc_position;
     ds->sk.active_flags = AF_X | AF_Y | AF_Z;
     return &ds->sk;
 }
