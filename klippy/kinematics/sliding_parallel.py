@@ -242,7 +242,8 @@ class SlidingParallelKinematics:
         logging.info("Forward Kinematics starting, solving for stepper positions (%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) mm..."
                       % (spos[0],spos[1],spos[2],spos[3],spos[4],spos[5]))
 
-        current_guess = [0., 0., (self.max_z-self.min_z)/2.]
+        # current_guess = [0., 0., (self.max_z-self.min_z)/2.]
+        current_guess = [0., 0., 190]
 
         for q in range(max_iterations):
             logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm" % (q,current_guess[0],current_guess[1],current_guess[2]))
@@ -256,7 +257,7 @@ class SlidingParallelKinematics:
             # new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
             a = getMatrixInverse(jacc)
             logging.info("Inverse Jacobian = %s" % (a.__str__()))
-            
+
             d = mathutil.mat_mat_mul(jacc, a)
             logging.info("Check (should be identity matrix) = %s" % (d.__str__()))
 
