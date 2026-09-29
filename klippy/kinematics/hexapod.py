@@ -238,12 +238,9 @@ class HexapodKinematics:
 
             jacT[axis,:] = (positive-negative) / (2*delta[axis])
 
-        jac = jacT.T
-        
-        logging.info("Jacobian = %s" % (jac.__str__()))
+        return jacT.T
 
-        return jac
-
+    # Calculate the cartesian coordinates for a given set of stepper positions
     def _actuator_to_cartesian(self, spos, initial_guess=None):
         max_iterations = 100
         convergence = 1e-10
@@ -251,6 +248,7 @@ class HexapodKinematics:
         logging.info("Forward Kinematics starting, solving for stepper positions (%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) mm..."
                       % (spos[0],spos[1],spos[2],spos[3],spos[4],spos[5]))
 
+        # If no initial guess is supplied, then assume halfway up inside the build volume
         if initial_guess is None:
             current_guess = np.array([0., 0., (self.max_z-self.min_z)/2.])
         else:
@@ -259,32 +257,24 @@ class HexapodKinematics:
         for q in range(max_iterations):
             logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm" % (q,current_guess[0],current_guess[1],current_guess[2]))
 
-            jacobian = self.get_jacobian(current_guess)
+            # Refine the cartesian coordinates guess using the Newton-Raphson method
+            new_guess = current_guess - np.matmul(np.linalg.inv(self.get_jacobian(current_guess))
+                                                  , np.array(self.calc_actuator(current_guess)[::2]) - spos[::2])
 
-            legs_current = np.array(self.calc_actuator(current_guess)[::2])
-            logging.info("Current guess stepper positions = %.3f, %.3f, %.3f" % (legs_current[0],legs_current[1],legs_current[2]))
-
-            # target_error = [a-b for a,b in zip(legs_current, spos[::2])]
-            target_error = legs_current - spos[::2]
-            logging.info("Positional error = (%.3f,%.3f,%.3f) mm" % (target_error[0],target_error[1],target_error[2]))
-
-            a = np.linalg.inv(jacobian)
-            logging.info("Inverse Jacobian = %s" % (a.__str__()))
-
-            d = np.dot(a,jacobian)
-            logging.info("Check (should be identity matrix) = %s" % (d.__str__()))
-
-            new_guess = current_guess - np.matmul(a, target_error)
-
+            # Calculate the size of the change during this iteration
             delta = np.sum(np.abs((current_guess-new_guess)/(current_guess+new_guess)))
 
-            current_guess = new_guess
-
+            # Test for successful convergence to stop the solver
             if delta <= convergence:
                 logging.info("Convergence criterion achieved: %g < %g" % (delta, convergence))
                 break
+            
+            # Setup for next iteration
+            current_guess = new_guess
 
-        return current_guess
+            logging.info("Cartesian coordinates calculated to be (%.3f,%.3f%.3f) mm" % (current_guess[0],current_guess[1],current_guess[2]))
+
+        return float(current_guess)
 
 ##########################
 
