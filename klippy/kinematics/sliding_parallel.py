@@ -251,6 +251,9 @@ class SlidingParallelKinematics:
             jacc = self.get_jacobian(current_guess)
 
             legs_current = self.calc_actuator(current_guess)[::2]
+
+            logging.info("Current guess stepper positions = %.3f, %.3f, %.3f" % (legs_current[0],legs_current[1],legs_current[2]))
+
             target_error = [a-b for a,b in zip(legs_current, spos[::2])]
 
             logging.info("Positional error = (%.3f,%.3f,%.3f) mm" % (target_error[0],target_error[1],target_error[2]))
