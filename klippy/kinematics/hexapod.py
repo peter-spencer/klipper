@@ -259,7 +259,7 @@ class HexapodKinematics:
         for q in range(max_iterations):
             logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm" % (q,current_guess[0],current_guess[1],current_guess[2]))
 
-            jacc = self.get_jacobian(current_guess)
+            jacobian = self.get_jacobian(current_guess)
 
             legs_current = np.array(self.calc_actuator(current_guess)[::2])
             logging.info("Current guess stepper positions = %.3f, %.3f, %.3f" % (legs_current[0],legs_current[1],legs_current[2]))
@@ -268,17 +268,14 @@ class HexapodKinematics:
             target_error = legs_current - spos[::2]
             logging.info("Positional error = (%.3f,%.3f,%.3f) mm" % (target_error[0],target_error[1],target_error[2]))
 
-            a = np.linalg.inv(jacc)
+            a = np.linalg.inv(jacobian)
             logging.info("Inverse Jacobian = %s" % (a.__str__()))
 
-            d = np.dot(a,jacc)
+            d = np.dot(a,jacobian)
             logging.info("Check (should be identity matrix) = %s" % (d.__str__()))
 
-            b = target_error
-            # new_guess = [current_guess[c] - (a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2]) for c in range(3)]
-            new_guess = current_guess - np.dot(a, b)
+            new_guess = current_guess - np.matmul(a, target_error)
 
-            # delta = sum([abs((current_guess[c]-new_guess[c])/(current_guess[c]+new_guess[c])) for c in range(3)])
             delta = np.sum(np.abs((current_guess-new_guess)/(current_guess+new_guess)))
 
             current_guess = new_guess
