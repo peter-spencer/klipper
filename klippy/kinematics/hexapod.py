@@ -29,11 +29,11 @@ class HexapodKinematics:
             import numpy as np
         except:
             raise config.error("Hexapod kinematics requires the NumPy module")
-        # try:
-        #     global scipy
-        #     import scipy
-        # except:
-        #     raise config.error("Hexapod kinematics requires the SciPy module")
+        try:
+            global scipy
+            import scipy
+        except:
+            raise config.error("Hexapod kinematics requires the SciPy module")
 
         # Setup tower rails
         stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
