@@ -267,7 +267,8 @@ class SlidingParallelKinematics:
             logging.info("Check (should be identity matrix) = %s" % (d.__str__()))
 
             b = target_error
-            new_guess = [current_guess[c] - a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2] for c in range(3)]
+            # new_guess = [current_guess[c] - a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2] for c in range(3)]
+            new_guess = [current_guess[c] - a[0][c]*b[0]+a[1][c]*b[1]+a[2][c]*b[2] for c in range(3)]
 
             delta = sum([abs((current_guess[c]-new_guess[c])/(current_guess[c]+new_guess[c])) for c in range(3)])
 
