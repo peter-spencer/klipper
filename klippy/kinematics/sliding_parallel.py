@@ -235,15 +235,17 @@ class SlidingParallelKinematics:
 
         return jac
 
-    def _actuator_to_cartesian(self, spos):
+    def _actuator_to_cartesian(self, spos, initial_guess=None):
         max_iterations = 100
         convergence = 1e-10
 
         logging.info("Forward Kinematics starting, solving for stepper positions (%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) mm..."
                       % (spos[0],spos[1],spos[2],spos[3],spos[4],spos[5]))
 
-        # current_guess = [0., 0., (self.max_z-self.min_z)/2.]
-        current_guess = [0., 0., 190]
+        if initial_guess is None:
+            current_guess = [0., 0., (self.max_z-self.min_z)/2.]
+        else:
+            current_guess = initial_guess.copy()
 
         for q in range(max_iterations):
             logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm" % (q,current_guess[0],current_guess[1],current_guess[2]))
@@ -251,15 +253,11 @@ class SlidingParallelKinematics:
             jacc = self.get_jacobian(current_guess)
 
             legs_current = self.calc_actuator(current_guess)[::2]
-
             logging.info("Current guess stepper positions = %.3f, %.3f, %.3f" % (legs_current[0],legs_current[1],legs_current[2]))
 
             target_error = [a-b for a,b in zip(legs_current, spos[::2])]
-
             logging.info("Positional error = (%.3f,%.3f,%.3f) mm" % (target_error[0],target_error[1],target_error[2]))
 
-            # change = [[sum(map(operator.mul, a_i, bt_j)) for bt_j in target_error] for a_i in getMatrixInverse(jacc)]
-            # new_guess = current_guess - mathutil.mat_mat_mul(getMatrixInverse(jacc),target_error)
             a = getMatrixInverse(jacc)
             logging.info("Inverse Jacobian = %s" % (a.__str__()))
 
