@@ -276,7 +276,7 @@ class HexapodKinematics:
 
             b = target_error
             # new_guess = [current_guess[c] - (a[c][0]*b[0]+a[c][1]*b[1]+a[c][2]*b[2]) for c in range(3)]
-            new_guess = current_guess - a * b
+            new_guess = current_guess - np.dot(a, b)
 
             # delta = sum([abs((current_guess[c]-new_guess[c])/(current_guess[c]+new_guess[c])) for c in range(3)])
             delta = np.sum(np.abs((current_guess-new_guess)/(current_guess+new_guess)))
