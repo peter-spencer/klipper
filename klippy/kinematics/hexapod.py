@@ -233,8 +233,8 @@ class HexapodKinematics:
 
             # positive = self.calc_actuator([a+b for a,b in zip(new_coordinates, delta)])
             # negative = self.calc_actuator([a-b for a,b in zip(new_coordinates, delta)])
-            positive = self.calc_actuator(coordinates + delta)
-            negative = self.calc_actuator(coordinates - delta)
+            positive = self.calc_actuator(coordinates + delta)[::2]
+            negative = self.calc_actuator(coordinates - delta)[::2]
 
             jacT[axis,:] = (positive-negative) / (2*delta[axis])
 
