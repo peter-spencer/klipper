@@ -230,7 +230,7 @@ class HexapodKinematics:
 
         # XYZ translations only
         for axis in range(3):
-            delta = np.array([0,0,0])
+            delta = [0,0,0]
             delta[axis] = delta_position
             logging.info("Delta = %s" % (delta))
 
