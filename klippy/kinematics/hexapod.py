@@ -295,7 +295,7 @@ class HexapodKinematics:
         for r, j in zip(self.rails, self.joints):
             for s in r.get_steppers():
                 sk = s.get_stepper_kinematics()
-                ffi_lib.input_shaper_set_shaper_params(sk, j[0], j[1], j[2])
+                ffi_lib.hexapod_set_params(sk, j[0], j[1], j[2])
 
         logging.info("Updated effector angle to %.3f degrees" % (self.offset_angle))
     
