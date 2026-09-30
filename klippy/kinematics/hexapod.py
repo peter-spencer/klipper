@@ -294,6 +294,7 @@ class HexapodKinematics:
         ffi_main, ffi_lib = chelper.get_ffi()
         for r, j in zip(self.rails, self.joints):
             for s in r.get_steppers():
+                logging.info("Updating effector: %.3f, %.3f" % (r, s))
                 sk = s.get_stepper_kinematics()
                 ffi_lib.hexapod_set_params(sk, ffi_main.cast("double", j[0]), ffi_main.cast("double", j[1]), ffi_main.cast("double", j[2]))
 
