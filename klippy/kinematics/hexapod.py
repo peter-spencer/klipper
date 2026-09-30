@@ -223,7 +223,6 @@ class HexapodKinematics:
     # of the amount of displacement for calculating the derivatives.
     def get_jacobian(self, coordinates, delta_position = 0.001):
         coordinates = np.array(coordinates)
-        logging.info("Coordinates = %s" % (coordinates))
                 
         # Declare the matrix for the result
         jacT = np.ones(shape=(3,3))
@@ -232,17 +231,11 @@ class HexapodKinematics:
         for axis in range(3):
             delta = [0,0,0]
             delta[axis] = delta_position
-            logging.info("Delta = %s" % (delta))
-
+            
             positive = np.array(self.calc_actuator(coordinates + delta)[::2])
             negative = np.array(self.calc_actuator(coordinates - delta)[::2])
 
-            logging.info("Positive = %s" % (positive.__str__()))
-            logging.info("Negative = %s" % (negative.__str__()))
-
             jacT[axis,:] = (positive-negative) / (2*delta[axis])
-
-        logging.info("Jacobian = %s" % (jacT.T.__str__()))
 
         return jacT.T
 
