@@ -38,6 +38,11 @@ class HexapodKinematics:
         # Setup tower rails
         stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
 
+        # Remember the toolhead and config (DOES DOING THIS BREAK ANYTHING LATER????)
+        self.toolhead = toolhead
+        self.config = config
+        self.stepper_configs = stepper_configs
+
         # Load the first rail, stepper_a
         rail_a = stepper.LookupMultiRail(stepper_configs[0], need_position_minmax = False)
 
@@ -50,7 +55,7 @@ class HexapodKinematics:
             default_position_endstop=default_endstop) for stepper_config in stepper_configs[1:]]
 
         # Setup max velocity
-        self.max_velocity, self.max_accel = toolhead.get_max_velocity()
+        self.max_velocity, self.max_accel = self.toolhead.get_max_velocity()
         self.max_z_velocity = config.getfloat(
             'max_z_velocity', self.max_velocity,
             above=0., maxval=self.max_velocity)
@@ -85,34 +90,9 @@ class HexapodKinematics:
                     "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
                     % (self.angles[0],self.angles[1],self.angles[2],self.angles[3],self.angles[4],self.angles[5]))
 
-        # Determine joint locations on the effector
-        effector_radius = config.getfloat('effector_radius', above=0.)   # Radius of the circle of joints on the effector (distance in mm)
-        effector_z = config.getfloat('effector_z', 0.)                   # Height offset of the joints on the effector (displacement in mm)
-        a = config.getfloat('effector_pair_spacing', 150.)               # Angle of the centre of the first pair (angle in degrees)
-        b = config.getfloat('effector_pair_spacing', 120., above=0.)     # Spacing between centre of each pair (angle in degrees)
-        c = config.getfloat('effector_pair_gap', 10., above=0.) * .5     # Gap between each pair (angle in degrees)
-        default_joint_angles = [ (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0, (a-c)%360.0 ]
+        self._calculate_effector_joints()
 
-        # Now calculate the specific angles and positions of the towers
-        joint_angles = [sconfig.getfloat('effector_angle', angle)
-                        for sconfig, angle in zip(stepper_configs, default_joint_angles)]
-        self.joints = [(math.cos(math.radians(angle)) * effector_radius,
-                        math.sin(math.radians(angle)) * effector_radius,
-                        effector_z)
-                        for angle in joint_angles]
-
-        logging.info(
-                    "Effector joint angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
-                    % (joint_angles[0],joint_angles[1],joint_angles[2],joint_angles[3],joint_angles[4],joint_angles[5]))
-
-
-        # Setup the iterative solver (for converting XYZ move into stepper movements)
-        for r, a, t, j in zip(self.rails, self.arm2, self.towers, self.joints):
-            r.setup_itersolve('sliding_parallel_stepper_alloc', a, t[0], t[1], j[0], j[1], j[2])
-        
-        # Setup trapezoidal generator / look-ahead queue
-        for s in self.get_steppers():
-            s.set_trapq(toolhead.get_trapq())
+        self._setup_iterative_solver()
 
         # Calculate the absolute position of each endstop. The normal endstop is the
         # height of the nozzle above the heated bed (in mm), the absolute endstop is
@@ -171,12 +151,43 @@ class HexapodKinematics:
                         math.sqrt(self.very_slow_xy2)))
 
         # Set minium and maximum axes positions to define allowed build volume
-        self.axes_min = toolhead.Coord((-max_xy, -max_xy, self.min_z))
-        self.axes_max = toolhead.Coord((max_xy, max_xy, self.max_z))
+        self.axes_min = self.toolhead.Coord((-max_xy, -max_xy, self.min_z))
+        self.axes_max = self.toolhead.Coord((max_xy, max_xy, self.max_z))
 
         # Why was this here? What did it do?
         # self.set_position([0., 0., 0.], "")
 
+    def _setup_iterative_solver(self):
+        # Setup the iterative solver (for converting XYZ move into stepper movements)
+        for r, a, t, j in zip(self.rails, self.arm2, self.towers, self.joints):
+            r.setup_itersolve('sliding_parallel_stepper_alloc', a, t[0], t[1], j[0], j[1], j[2])
+        
+        # Setup trapezoidal generator / look-ahead queue
+        for s in self.get_steppers():
+            s.set_trapq(self.toolhead.get_trapq())
+
+    def _calculate_effector_joints(self, offset_angle = 0):
+        self.offset_angle = offset_angle
+
+        # Determine joint locations on the effector
+        effector_radius = self.config.getfloat('effector_radius', above=0.)   # Radius of the circle of joints on the effector (distance in mm)
+        effector_z = self.config.getfloat('effector_z', 0.)                   # Height offset of the joints on the effector (displacement in mm)
+        a = self.config.getfloat('effector_pair_start', 150.) + offset_angle  # Angle of the centre of the first pair (angle in degrees)
+        b = self.config.getfloat('effector_pair_spacing', 120., above=0.)     # Spacing between centre of each pair (angle in degrees)
+        c = self.config.getfloat('effector_pair_gap', 10., above=0.) * .5     # Gap between each pair (angle in degrees)
+        default_joint_angles = [ (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0, (a-c)%360.0 ]
+
+        # Now calculate the specific angles and positions of the towers
+        joint_angles = [sconfig.getfloat('effector_angle', angle)
+                        for sconfig, angle in zip(self.stepper_configs, default_joint_angles)]
+        self.joints = [(math.cos(math.radians(angle)) * effector_radius,
+                        math.sin(math.radians(angle)) * effector_radius,
+                        effector_z)
+                        for angle in joint_angles]
+
+        logging.info(
+                    "Effector joint angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
+                    % (joint_angles[0],joint_angles[1],joint_angles[2],joint_angles[3],joint_angles[4],joint_angles[5]))
 
     # Get the stepper motor positions    
     def get_steppers(self):
@@ -231,7 +242,7 @@ class HexapodKinematics:
         for axis in range(3):
             delta = [0,0,0]
             delta[axis] = delta_position
-            
+
             positive = np.array(self.calc_actuator(coordinates + delta)[::2])
             negative = np.array(self.calc_actuator(coordinates - delta)[::2])
 
@@ -273,7 +284,15 @@ class HexapodKinematics:
 
         logging.info("Cartesian coordinates calculated to be (%.3f,%.3f,%.3f) mm" % (current_guess[0],current_guess[1],current_guess[2]))
 
+        self.update_effector()
+
         return current_guess.astype(float).tolist()
+
+    def update_effector(self):
+        self.offset_angle += 5
+        self._calculate_effector_joints(self.offset_angle)
+        self._setup_iterative_solver()
+        logging.info("Updated effector angle to %.3f degrees" % (self.offset_angle))
     
 ##########################
 
