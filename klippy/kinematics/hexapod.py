@@ -232,8 +232,8 @@ class HexapodKinematics:
             delta = np.array([0,0,0])
             delta[axis] = delta_position
 
-            positive = self.calc_actuator(coordinates + delta)[::2]
-            negative = self.calc_actuator(coordinates - delta)[::2]
+            positive = np.array(self.calc_actuator(coordinates + delta)[::2])
+            negative = np.array(self.calc_actuator(coordinates - delta)[::2])
 
             jacT[axis,:] = (positive-negative) / (2*delta[axis])
 
