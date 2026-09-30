@@ -47,3 +47,11 @@ hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double joint_
     ds->sk.active_flags = AF_X | AF_Y | AF_Z;
     return &ds->sk;
 }
+
+void __visible hexapod_set_params(struct stepper_kinematics *sk, double joint_x, double joint_y, double joint_z)
+{
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+    ds->joint_x = joint_x;
+    ds->joint_y = joint_y;
+    ds->joint_z = joint_z;
+}

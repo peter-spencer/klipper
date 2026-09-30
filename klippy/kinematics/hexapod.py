@@ -12,7 +12,7 @@
 #  - longer term: DYNAMIC ROTATIONS (extra axes, iterative solver access?, accessible print areas and checks)
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import operator, math, logging
+import chelper, math, logging
 import stepper, mathutil
 
 # delay import until configuration time
@@ -291,7 +291,12 @@ class HexapodKinematics:
     def update_effector(self):
         self.offset_angle += 5
         self._calculate_effector_joints(self.offset_angle)
-        self._setup_iterative_solver()
+        ffi_main, ffi_lib = chelper.get_ffi()
+        for r, j in zip(self.rails, self.joints):
+            for s in r.get_steppers():
+                sk = s.get_stepper_kinematics()
+                ffi_lib.input_shaper_set_shaper_params(sk, j[0], j[1], j[2])
+
         logging.info("Updated effector angle to %.3f degrees" % (self.offset_angle))
     
 ##########################
