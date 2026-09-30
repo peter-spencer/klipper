@@ -46,8 +46,8 @@ class HexapodKinematics:
         default_endstop = rail_a.get_homing_info().position_endstop
 
         # Load the rest of the rails
-        self.rails = np.array([rail_a] + [stepper.LookupMultiRail(stepper_config, need_position_minmax = False,
-            default_position_endstop=default_endstop) for stepper_config in stepper_configs[1:]])
+        self.rails = [rail_a] + [stepper.LookupMultiRail(stepper_config, need_position_minmax = False,
+            default_position_endstop=default_endstop) for stepper_config in stepper_configs[1:]]
 
         # Setup max velocity
         self.max_velocity, self.max_accel = toolhead.get_max_velocity()
@@ -61,8 +61,8 @@ class HexapodKinematics:
         self.radius = radius = config.getfloat('delta_radius', above=0.)
         print_radius = config.getfloat('print_radius', radius, above=0.)
         arm_length_a = stepper_configs[0].getfloat('arm_length', above=radius)
-        self.arm_lengths = np.array([sconfig.getfloat('arm_length', arm_length_a, above=radius)
-                            for sconfig in stepper_configs])
+        self.arm_lengths = [sconfig.getfloat('arm_length', arm_length_a, above=radius)
+                            for sconfig in stepper_configs]
 
         # Store the squared length of the printer's arms to save on calculation time
         self.arm2 = np.square(self.arm_lengths)
@@ -75,11 +75,11 @@ class HexapodKinematics:
         default_tower_angles = [ (a-c)%360.0, (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0 ]
 
         # Now calculate the specific angles and positions of the towers
-        self.angles = np.array([sconfig.getfloat('angle', angle)
-                       for sconfig, angle in zip(stepper_configs, default_tower_angles)])
-        self.towers = np.array([(math.cos(math.radians(angle)) * radius,
+        self.angles = [sconfig.getfloat('angle', angle)
+                       for sconfig, angle in zip(stepper_configs, default_tower_angles)]
+        self.towers = [(math.cos(math.radians(angle)) * radius,
                         math.sin(math.radians(angle)) * radius)
-                       for angle in self.angles])
+                       for angle in self.angles]
 
         logging.info(
                     "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
@@ -94,12 +94,12 @@ class HexapodKinematics:
         default_joint_angles = [ (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0, (a-c)%360.0 ]
 
         # Now calculate the specific angles and positions of the towers
-        joint_angles = np.array([sconfig.getfloat('effector_angle', angle)
-                        for sconfig, angle in zip(stepper_configs, default_joint_angles)])
-        self.joints = np.array([(math.cos(math.radians(angle)) * effector_radius,
+        joint_angles = [sconfig.getfloat('effector_angle', angle)
+                        for sconfig, angle in zip(stepper_configs, default_joint_angles)]
+        self.joints = [(math.cos(math.radians(angle)) * effector_radius,
                         math.sin(math.radians(angle)) * effector_radius,
                         effector_z)
-                        for angle in joint_angles])
+                        for angle in joint_angles]
 
         logging.info(
                     "Effector joint angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
@@ -117,9 +117,9 @@ class HexapodKinematics:
         # Calculate the absolute position of each endstop. The normal endstop is the
         # height of the nozzle above the heated bed (in mm), the absolute endstop is
         # that stepper's position along its rail when homed.
-        self.endstops = np.array([rail.get_homing_info().position_endstop for rail in self.rails])
-        self.abs_endstops = np.array([self._cartesian_to_actuator((0,0,endstop), arm2, tower, joint)
-                             for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)])
+        self.endstops = [rail.get_homing_info().position_endstop for rail in self.rails]
+        self.abs_endstops = [self._cartesian_to_actuator((0,0,endstop), arm2, tower, joint)
+                             for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)]
 
         logging.info(
                     "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
@@ -180,7 +180,7 @@ class HexapodKinematics:
 
     # Get the stepper motor positions    
     def get_steppers(self):
-        return np.array([s for rail in self.rails for s in rail.get_steppers()])
+        return [s for rail in self.rails for s in rail.get_steppers()]
 
     # Set the stepper motor positions
     def set_position(self, newpos, homing_axes):
@@ -208,8 +208,8 @@ class HexapodKinematics:
 
     # Return a list of stepper positions for the given effector coordinates
     def calc_actuator(self, coordinates):
-        return np.array([self._cartesian_to_actuator(coordinates, arm2, tower, joint)
-                for arm2, tower, joint in zip(self.arm2, self.towers, self.joints)])
+        return [self._cartesian_to_actuator(coordinates, arm2, tower, joint)
+                for arm2, tower, joint in zip(self.arm2, self.towers, self.joints)]
 
     ######  Forward Kinematics  ######
     
@@ -231,8 +231,6 @@ class HexapodKinematics:
             delta = [0,0,0]
             delta[axis] = delta_position
 
-            # positive = self.calc_actuator([a+b for a,b in zip(new_coordinates, delta)])
-            # negative = self.calc_actuator([a-b for a,b in zip(new_coordinates, delta)])
             positive = self.calc_actuator(coordinates + delta)[::2]
             negative = self.calc_actuator(coordinates - delta)[::2]
 
@@ -272,7 +270,7 @@ class HexapodKinematics:
             # Setup for next iteration
             current_guess = new_guess
 
-            logging.info("Cartesian coordinates calculated to be (%.3f,%.3f%.3f) mm" % (current_guess[0],current_guess[1],current_guess[2]))
+        logging.info("Cartesian coordinates calculated to be (%.3f,%.3f,%.3f) mm" % (current_guess[0],current_guess[1],current_guess[2]))
 
         return current_guess.astype(float).tolist()
     
