@@ -235,6 +235,9 @@ class HexapodKinematics:
             positive = np.array(self.calc_actuator(coordinates + delta)[::2])
             negative = np.array(self.calc_actuator(coordinates - delta)[::2])
 
+            logging.info("Positive = %s" % (positive.__str__()))
+            logging.info("Negative = %s" % (negative.__str__()))
+
             jacT[axis,:] = (positive-negative) / (2*delta[axis])
 
         logging.info("Jacobian = %s" % (jacT.T.__str__()))
