@@ -222,13 +222,14 @@ class HexapodKinematics:
     # Coordinates is a list or tuple of 3 floats for X,Y,Z coordinates and delta_position is half
     # of the amount of displacement for calculating the derivatives.
     def get_jacobian(self, coordinates, delta_position = 0.001):
+        coordinates = np.array(coordinates)
                 
         # Declare the matrix for the result
         jacT = np.ones(shape=(3,3))
 
         # XYZ translations only
         for axis in range(3):
-            delta = [0,0,0]
+            delta = np.array([0,0,0])
             delta[axis] = delta_position
 
             positive = self.calc_actuator(coordinates + delta)[::2]
