@@ -237,6 +237,8 @@ class HexapodKinematics:
 
             jacT[axis,:] = (positive-negative) / (2*delta[axis])
 
+        logging.info("Jacobian = %s" % (jacT.T.__str__()))
+
         return jacT.T
 
     # Calculate the cartesian coordinates for a given set of stepper positions
