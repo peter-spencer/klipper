@@ -274,8 +274,8 @@ class HexapodKinematics:
 
             logging.info("Cartesian coordinates calculated to be (%.3f,%.3f%.3f) mm" % (current_guess[0],current_guess[1],current_guess[2]))
 
-        return float(current_guess)
-
+        return current_guess.astype(float).tolist()
+    
 ##########################
 
 
