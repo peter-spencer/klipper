@@ -35,7 +35,7 @@ hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
 struct stepper_kinematics * __visible
 hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double joint_x, double joint_y, double joint_z)
 {
-    struct sliding_parallel_stepper *ds = malloc(sizeof(*ds));
+    struct hexapod_stepper *ds = malloc(sizeof(*ds));
     memset(ds, 0, sizeof(*ds));
     ds->arm2 = arm2;
     ds->tower_x = tower_x;
