@@ -157,6 +157,10 @@ class HexapodKinematics:
         # Why was this here? What did it do?
         # self.set_position([0., 0., 0.], "")
 
+        #### EXPERIMENTAL: Try adding extra axes for rotation angles ####
+        self.rotation = HexapodRotationAxis(self)
+        toolhead.add_extra_axis(self.rotation,0)
+
     def _setup_iterative_solver(self):
         # Setup the iterative solver (for converting XYZ move into stepper movements)
         for r, a, t, j in zip(self.rails, self.arm2, self.towers, self.joints):
@@ -284,12 +288,12 @@ class HexapodKinematics:
 
         logging.info("Cartesian coordinates calculated to be (%.3f,%.3f,%.3f) mm" % (current_guess[0],current_guess[1],current_guess[2]))
 
-        self.update_effector()
+        # self.update_effector()
 
         return current_guess.astype(float).tolist()
 
     def update_effector(self):
-        self.offset_angle += 5
+        # self.offset_angle += 5
         self._calculate_effector_joints(self.offset_angle)
         ffi_main, ffi_lib = chelper.get_ffi()
         for r, j in zip(self.rails, self.joints):
@@ -298,7 +302,7 @@ class HexapodKinematics:
                 sk = stepper.get_stepper_kinematics()
                 ffi_lib.hexapod_set_params(sk, ffi_main.cast("double", j[0]), ffi_main.cast("double", j[1]), ffi_main.cast("double", j[2]))
 
-        logging.info("Updated effector angle to %.3f degrees" % (self.offset_angle))
+        # logging.info("Updated effector angle to %.3f degrees" % (self.offset_angle))
     
 ##########################
 
@@ -379,6 +383,26 @@ class HexapodKinematics:
         return HexapodCalibration(self.radius, self.angles, self.arm_lengths,
                                 self.endstops, stepdists)
 
+
+class HexapodRotationAxis:
+    def __init__(self, kinematics):
+        self.kinematics = kinematics
+
+    def calc_junction(self, prev_move, move, axis_index):
+        # Return additional velocity?
+        return 0.
+
+    def process_move(self, next_move_time, move, axis_index):
+        pass
+
+    def check_move(self, move, axis_index):
+        pass
+
+    def get_name(self):
+        return 'rotation'
+
+    def get_axis_gcode_id(self):
+        return 'R'
 
 # Delta parameter calibration for DELTA_CALIBRATE tool
 class HexapodCalibration:
