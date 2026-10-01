@@ -397,6 +397,7 @@ class HexapodRotationAxis:
         return 0.
 
     def process_move(self, next_move_time, move, axis_index):
+        logging.info("Rotation axis move to %.3f" % (self.kinematics.toolhead.commanded_pos[axis_index]))
         pass
 
     def check_move(self, move, axis_index):
