@@ -157,9 +157,13 @@ class HexapodKinematics:
         # Why was this here? What did it do?
         # self.set_position([0., 0., 0.], "")
 
+        # Wait for everything to load
+        config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
+        
+    def _add_extra_axes(self):
         #### EXPERIMENTAL: Try adding extra axes for rotation angles ####
         self.rotation = HexapodRotationAxis(self)
-        toolhead.add_extra_axis(self.rotation,0)
+        self.toolhead.add_extra_axis(self.rotation,0)
 
     def _setup_iterative_solver(self):
         # Setup the iterative solver (for converting XYZ move into stepper movements)
