@@ -160,7 +160,7 @@ class HexapodKinematics:
     def _setup_iterative_solver(self):
         # Setup the iterative solver (for converting XYZ move into stepper movements)
         for r, a, t, j in zip(self.rails, self.arm2, self.towers, self.joints):
-            r.setup_itersolve('sliding_parallel_stepper_alloc', a, t[0], t[1], j[0], j[1], j[2])
+            r.setup_itersolve('hexapod_stepper_alloc', a, t[0], t[1], j[0], j[1], j[2])
         
         # Setup trapezoidal generator / look-ahead queue
         for s in self.get_steppers():
