@@ -4,7 +4,6 @@
 # Initially derived from delta.py by Kevin O'Connor
 #
 # TODO:
-#  - Import numpy/scipy and use it to avoid list maths, use better faster algorithms
 #  - Add a safety net for the Newton solver to stop it trying mathematically impossible solutions, or going out of bounds at all
 #  - check_move() to be improved
 #  - Is it worthwhile to have a more rigorous stepper speed check and movement slowing?
@@ -98,7 +97,7 @@ class HexapodKinematics:
         # height of the nozzle above the heated bed (in mm), the absolute endstop is
         # that stepper's position along its rail when homed.
         self.endstops = [rail.get_homing_info().position_endstop for rail in self.rails]
-        self.abs_endstops = [self._cartesian_to_actuator((0,0,endstop), arm2, tower, joint)
+        self.abs_endstops = [self._cartesian_to_actuator((0., 0., endstop, 0., 0., 0.), arm2, tower, joint)
                              for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)]
 
         logging.info(
@@ -157,18 +156,20 @@ class HexapodKinematics:
         # Why was this here? What did it do?
         # self.set_position([0., 0., 0.], "")
 
-        # Wait for everything to load
-        config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
-        
+        # # Setup extra axes for rotation control via G1 G-code commands
+        # self.rotations = [ HexapodRotationAxis(self, id) for id in 'ABC' ]
+
+        # # Wait for everything to load
+        # config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
+
+    # Add extra axes to the Toolhead for control over 
     def _add_extra_axes(self):
-        #### EXPERIMENTAL: Try adding extra axes for rotation angles ####
-        self.rotation = HexapodRotationAxis(self)
         self.toolhead.add_extra_axis(self.rotation,0)
 
     def _setup_iterative_solver(self):
         # Setup the iterative solver (for converting XYZ move into stepper movements)
-        for r, a, t, j in zip(self.rails, self.arm2, self.towers, self.joints):
-            r.setup_itersolve('hexapod_stepper_alloc', a, t[0], t[1], j[0], j[1], j[2])
+        for r, a, t, es, j in zip(self.rails, self.arm2, self.towers, self.abs_endstops, self.joints):
+            r.setup_itersolve('hexapod_stepper_alloc', a, t[0], t[1], es, j[0], j[1], j[2])
         
         # Setup trapezoidal generator / look-ahead queue
         for s in self.get_steppers():
@@ -219,8 +220,12 @@ class HexapodKinematics:
         tx, ty = tower
 
         # 3D positions without orientation
-        x, y, z = coordinates
-        jx, jy, jz = joint
+        x, y, z, a, b, c = coordinates
+
+        r = scipy.spatial.Rotation.from_euler('xyz', [a,b,c], degrees=True)
+
+        # jx, jy, jz = joint
+        [jx, jy, jz] = r.apply(np.array(joint))
 
         return math.sqrt(arm2 - (tx - jx - x)**2 
                               - (ty - jy - y)**2) + jz + z
@@ -232,27 +237,31 @@ class HexapodKinematics:
 
     ######  Forward Kinematics  ######
     
-    # Calculate the cartesian (X,Y,Z) position of the effector from the positions of the stepper motors
+    # Calculate the cartesian (X,Y,Z,A,B,C) position and orientation of the effector
+    # from the positions of the stepper motors
     def calc_position(self, stepper_positions):
         spos = np.array([stepper_positions[rail.get_name()] for rail in self.rails])
         return self._actuator_to_cartesian(spos)
 
     # Get the Jacobian matrix for change in stepper positions as a function of effector coordinates
-    # Coordinates is a list or tuple of 3 floats for X,Y,Z coordinates and delta_position is half
-    # of the amount of displacement for calculating the derivatives.
-    def get_jacobian(self, coordinates, delta_position = 0.001):
+    # Coordinates is a list or tuple of 3 floats for X,Y,Z coordinates and A,B,C Euler angles, while
+    # delta_position is half of the amount of displacement for calculating the derivatives.
+    def get_jacobian(self, coordinates, delta_position = 0.001, delta_rotation = 0.001):
         coordinates = np.array(coordinates)
                 
         # Declare the matrix for the result
-        jacT = np.ones(shape=(3,3))
+        jacT = np.ones(shape=(6,6))
 
-        # XYZ translations only
-        for axis in range(3):
-            delta = [0,0,0]
-            delta[axis] = delta_position
+        # Numerically calculate the derivative
+        for axis in range(6):
+            delta = [0,0,0,0,0,0]
+            if axis < 3:
+                delta[axis] = delta_position
+            else:
+                delta[axis] = delta_rotation
 
-            positive = np.array(self.calc_actuator(coordinates + delta)[::2])
-            negative = np.array(self.calc_actuator(coordinates - delta)[::2])
+            positive = np.array(self.calc_actuator(coordinates + delta))
+            negative = np.array(self.calc_actuator(coordinates - delta))
 
             jacT[axis,:] = (positive-negative) / (2*delta[axis])
 
@@ -268,16 +277,17 @@ class HexapodKinematics:
 
         # If no initial guess is supplied, then assume halfway up inside the build volume
         if initial_guess is None:
-            current_guess = np.array([0., 0., (self.max_z-self.min_z)/2.])
+            current_guess = np.array([0., 0., (self.max_z-self.min_z)/2., 0., 0. ,0.])
         else:
             current_guess = np.array(initial_guess)
 
         for q in range(max_iterations):
-            logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm" % (q,current_guess[0],current_guess[1],current_guess[2]))
+            logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm, (%.3f,%.3f,%.3f) deg" % (q,
+                current_guess[0],current_guess[1],current_guess[2],current_guess[3],current_guess[4],current_guess[5]))
 
             # Refine the cartesian coordinates guess using the Newton-Raphson method
             new_guess = current_guess - np.matmul(np.linalg.inv(self.get_jacobian(current_guess))
-                                                  , np.array(self.calc_actuator(current_guess)[::2]) - spos[::2])
+                                                  , np.array(self.calc_actuator(current_guess)) - spos)
 
             # Calculate the size of the change during this iteration
             delta = np.sum(np.abs((current_guess-new_guess)/(current_guess+new_guess)))
@@ -389,11 +399,15 @@ class HexapodKinematics:
 
 
 class HexapodRotationAxis:
-    def __init__(self, kinematics):
+    def __init__(self, kinematics, gcode_id):
         self.kinematics = kinematics
+        self._gcode_id = gcode_id
+        logging.info("Loaded Hexapod Rotation axis %s." % (self._gcode_id))
 
     def calc_junction(self, prev_move, move, axis_index):
-        # Return additional velocity?
+        return move.max_cruise_v2
+
+    def find_past_position(self, print_time):
         return 0.
 
     def process_move(self, next_move_time, move, axis_index):
@@ -403,11 +417,14 @@ class HexapodRotationAxis:
     def check_move(self, move, axis_index):
         pass
 
-    def get_name(self):
-        return 'rotation'
+    def get_trapq(self):
+        return None
 
+    def get_name(self):
+        return ""
+    
     def get_axis_gcode_id(self):
-        return 'R'
+        return self._gcode_id
 
 # Delta parameter calibration for DELTA_CALIBRATE tool
 class HexapodCalibration:
