@@ -143,7 +143,7 @@ defs_kin_sliding_parallel = """
 
 defs_kin_hexapod = """
     struct stepper_kinematics *hexapod_stepper_alloc(double arm2
-        , double tower_x, double tower_y, double joint_x, double joint_y, double joint_z);
+        , double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z);
 """
 
 defs_kin_deltesian = """
