@@ -277,8 +277,10 @@ def check_build_code(sources, target):
 
 # Check if the current gcc version supports a particular command-line option
 def check_gcc_option(option):
-    cmd = "%s %s -S -o /dev/null -xc /dev/null > /dev/null 2>&1" % (
-        GCC_CMD, option)
+    # cmd = "%s %s -S -o /dev/null -xc /dev/null > /dev/null 2>&1" % (
+    #     GCC_CMD, option)
+    cmd = "%s %s -S -o /dev/null -xc /dev/null > /home/hex/gcc.log 2>&1" % (
+         GCC_CMD, option)
     res = os.system(cmd)
     return res == 0
 
