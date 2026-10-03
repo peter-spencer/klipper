@@ -222,7 +222,7 @@ class HexapodKinematics:
         # 3D positions without orientation
         x, y, z, a, b, c = coordinates
 
-        r = scipy.spatial.Rotation.from_euler('xyz', [a,b,c], degrees=True)
+        r = scipy.spatial.transform.Rotation.from_euler('xyz', [a,b,c], degrees=True)
 
         # jx, jy, jz = joint
         [jx, jy, jz] = r.apply(np.array(joint))
