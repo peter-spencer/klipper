@@ -421,11 +421,15 @@ class HexapodRotationAxis:
         return 0.
 
     def process_move(self, next_move_time, move, axis_index):
-        logging.info("Rotation axis move to %.3f" % (self.kinematics.toolhead.commanded_pos[axis_index]))
-        pass
+        self.commanded_pos = self.kinematics.toolhead.commanded_pos[axis_index]
+        logging.info("Rotation axis %s: Process Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
+                        (self.get_axis_gcode_id(),move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
+        logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
 
     def check_move(self, move, axis_index):
-        pass
+        logging.info("Rotation axis %s: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
+                        (self.get_axis_gcode_id(),move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
+        logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
 
     def get_trapq(self):
         return None
