@@ -443,8 +443,8 @@ class HexapodRotationAxis:
             steppers = rail.get_steppers()
             for stepper in steppers:
                 sk = stepper.get_stepper_kinematics()
-                ffi_lib.hexapod_stepper_set_rotation_move(sk, start_pos, list(start_rot.as_quat(scalar_first=True)),
-                                                      end_pos, list(end_rot.as_quat(scalar_first=True)));
+                ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
+                                                      list(end_pos), list(end_rot.as_quat(scalar_first=True)));
 
     def check_move(self, move, axis_index):
         logging.info("Rotation axis %s: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
