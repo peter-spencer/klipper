@@ -44,9 +44,23 @@ struct hexapod_stepper {
     Quaternion start_rot, end_rot;  // Initial rotation and Final rotation
 };
 
-static double
-hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
-                            , double move_time)
+
+void hexapod_stepper_calc_joint(struct stepper_kinematics *sk, struct coord *out, double t)
+{
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+    Quaternion step_rotation;
+        
+    // Proportional of distance travelled at the current point in the move
+    // double t = move_get_distance(m, move_time) / move_get_distance(m, m->move_t);
+
+    // Use spherical linear interpolation to get the correct rotation
+    Quaternion_slerp(&ds->start_rot, &ds->end_rot, t, &step_rotation);
+
+    // Rotate the joint into position
+    Quaternion_rotate(&step_rotation, &ds->joint.axis, out->axis);
+}
+
+static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m, double move_time)
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
     struct coord effector_position = move_get_coord(m, move_time);
@@ -80,35 +94,6 @@ hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
     // Calculate the correct position for the printer rail at this point in the move
     return sqrt(ds->arm2 - dx*dx - dy*dy) + dz;
 }
-
-void hexapod_stepper_calc_joint(struct stepper_kinematics *sk, struct coord *out, double t)
-{
-    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
-    Quaternion step_rotation;
-        
-    // Proportional of distance travelled at the current point in the move
-    // double t = move_get_distance(m, move_time) / move_get_distance(m, m->move_t);
-
-    // Use spherical linear interpolation to get the correct rotation
-    Quaternion_slerp(&ds->start_rot, &ds->end_rot, t, &step_rotation);
-
-    // Rotate the joint into position
-    Quaternion_rotate(&step_rotation, &ds->joint, &out);
-}
-
-/*static double
-hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m
-                            , double move_time)
-{
-    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
-    struct coord c = move_get_coord(m, move_time);
-
-    double dx = ds->tower.x - (c.x + ds->joint.x);
-    double dy = ds->tower.y - (c.y + ds->joint.y);
-    double dz = c.z + ds->joint.z;
-
-    return sqrt(ds->arm2 - dx*dx - dy*dy) + dz;
-}*/
 
 struct stepper_kinematics * __visible
 hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z)
@@ -146,8 +131,3 @@ hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_
     ds->sk.active_flags = AF_X | AF_Y | AF_Z;
     return &ds->sk;
 }
-
-// void __visible hexapod_set_move_rotation(struct stepper_kinematics *sk, double axis_x, double axis_y, double axis_z, double rate)
-// {
-//     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
-// }
