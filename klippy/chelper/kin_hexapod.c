@@ -152,7 +152,7 @@ void __visible hexapod_stepper_test_rotation(struct stepper_kinematics *sk)
     double start_angle = 0.0;
 
     double end_position[3] = { 0.0, 0.0, 50.0 };
-    double end_angle = 0.0;
+    double end_angle = 30.0;
 
     Quaternion_fromZRotation(start_angle / 180.0 * 3.141592, &start_orientation);
     start_rot[0] = start_orientation.w;
