@@ -225,7 +225,7 @@ class HexapodKinematics:
         r = scipy.spatial.transform.Rotation.from_euler('xyz', [a,b,c], degrees=True)
 
         # jx, jy, jz = joint
-        [jx, jy, jz] = r.apply(np.array(joint))
+        [jx, jy, jz] = r.apply(np.array(joint)).astype('float')
 
         return math.sqrt(arm2 - (tx - jx - x)**2 
                               - (ty - jy - y)**2) + jz + z
