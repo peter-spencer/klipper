@@ -334,7 +334,8 @@ class HexapodKinematics:
         forcepos = list(self.home_position)[:3]
         # This forces the Z value... It's from the Delta code so needs to be changed...
         forcepos[2] = -1.5 * math.sqrt(max(self.arm2)-self.max_xy2)
-        homing_state.home_rails(self.rails, forcepos, self.home_position)
+        # Klipper natively supports only (X,Y,Z) coordinates
+        homing_state.home_rails(self.rails, forcepos, self.home_position[:3])
 
 
     # Check that a proposed move will be possible
