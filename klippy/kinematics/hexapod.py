@@ -171,10 +171,10 @@ class HexapodKinematics:
 
         # Setup the iterative solver (for converting XYZ move into stepper movements)
         for r, a, t, es, j in zip(self.rails, self.arm2, self.towers, self.abs_endstops, self.joints):
-            #r.setup_itersolve('hexapod_stepper_alloc', a, t[0], t[1], es, j[0], j[1], j[2])
-            b = ffi_main.new("struct coord", [t[0], t[1], es])
-            c = ffi_main.new("struct coord", list(j))
-            r.setup_itersolve('hexapod_stepper_alloc', a, b, c)
+            r.setup_itersolve('hexapod_stepper_alloc', a, t[0], t[1], es, j[0], j[1], j[2])
+            # b = ffi_main.new("struct coord", [t[0], t[1], es])
+            # c = ffi_main.new("struct coord", list(j))
+            # r.setup_itersolve('hexapod_stepper_alloc', a, b, c)
         
         # Setup trapezoidal generator / look-ahead queue
         for s in self.get_steppers():

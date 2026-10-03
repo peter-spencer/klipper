@@ -206,26 +206,26 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
 
 
 struct stepper_kinematics * __visible
-hexapod_stepper_alloc(double arm2, struct coord *tower, struct coord *joint)
-//hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z)
+// hexapod_stepper_alloc(double arm2, struct coord *tower, struct coord *joint)
+hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z)
 {
     struct hexapod_stepper *ds = malloc(sizeof(*ds));
     memset(ds, 0, sizeof(*ds));
 
     ds->arm2 = arm2;
     
-    ds->tower.x = tower->x;
-    ds->tower.y = tower->y;
-    ds->tower.z = tower->z;
-    ds->joint.x = joint->x;
-    ds->joint.y = joint->y;
-    ds->joint.z = joint->z;
-    // ds->tower.x = tower_x;
-    // ds->tower.y = tower_y;
-    // ds->tower.z = tower_z;
-    // ds->joint.x = joint_x;
-    // ds->joint.y = joint_y;
-    // ds->joint.z = joint_z;
+    // ds->tower.x = tower->x;
+    // ds->tower.y = tower->y;
+    // ds->tower.z = tower->z;
+    // ds->joint.x = joint->x;
+    // ds->joint.y = joint->y;
+    // ds->joint.z = joint->z;
+    ds->tower.x = tower_x;
+    ds->tower.y = tower_y;
+    ds->tower.z = tower_z;
+    ds->joint.x = joint_x;
+    ds->joint.y = joint_y;
+    ds->joint.z = joint_z;
     
     // Setup state information (no rotation)
     hexapod_stepper_clear_rotation(&ds->sk);
