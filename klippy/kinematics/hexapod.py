@@ -157,15 +157,16 @@ class HexapodKinematics:
         # self.set_position([0., 0., 0.], "")
 
         # Setup extra axes for rotation control via G1 G-code commands
-        self.rotations = [ HexapodRotationAxis(self, id) for id in 'ABC' ]
+        self.rotation_axes = [ HexapodRotationAxis(self, id) for id in 'ABC' ]
 
         # Wait for everything to load
         config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
 
     # Add extra axes to the Toolhead for control over 
     def _add_extra_axes(self):
-        self.toolhead.add_extra_axis(self.rotation,0)
-
+        for rotation in self.rotation_axes:
+            self.toolhead.add_extra_axis(rotation, rotation.commanded_pos)
+            
     def _setup_iterative_solver(self):
         ffi_main, ffi_lib = chelper.get_ffi()
 
@@ -407,9 +408,10 @@ class HexapodKinematics:
 
 
 class HexapodRotationAxis:
-    def __init__(self, kinematics, gcode_id):
+    def __init__(self, kinematics, gcode_id, initial_position=0.):
         self.kinematics = kinematics
         self._gcode_id = gcode_id
+        self.commanded_pos = initial_position
         logging.info("Loaded Hexapod Rotation axis %s." % (self._gcode_id))
 
     def calc_junction(self, prev_move, move, axis_index):
