@@ -79,7 +79,7 @@ void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quaternion *ro
     }
 
     // Rotate the joint around the effector datum/origin point
-    Quaternion_rotate(&ds->orientation, ds->joint.axis, &ds->joint_actual.axis);
+    Quaternion_rotate(&ds->orientation, ds->joint.axis, ds->joint_actual.axis);
 
     // Set movement state going forward
     ds->move.active = enable;
@@ -183,7 +183,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         // 0 = further away that the start position, 1 = located at the end position
         // This is safe because if movement continues before rotation command is updated there
         // will not be any sudden discontinuous motion.
-        t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end) / ds->move.distance;
+        t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end.position) / ds->move.distance;
         
         if (t > 0.0) {
             // Rotate in proportion to how close the effector is to the end position
