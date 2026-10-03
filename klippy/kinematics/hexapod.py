@@ -346,6 +346,18 @@ class HexapodKinematics:
 
     # Check that a proposed move will be possible
     def check_move(self, move):
+
+        logging.info("Translation: Process Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
+                        (move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
+        logging.info("Dump start position:")
+        for d in move.start_pos:
+            logging.info("%.3f"%(d))
+        logging.info("Dump end position:")
+        for d in move.end_pos:
+            logging.info("%.3f"%(d))
+        logging.info("Translation axis report finished.")
+
+
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
 
