@@ -433,10 +433,10 @@ class HexapodRotationAxis:
         logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
 
         start_pos = move.start_pos[:3]
-        start_rot = scipy.spatial.transform.Rotation.from_euler('xyz', [move.start_pos[3],move.start_pos[4],move.start_pos[5]], degrees=True)
+        start_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [move.start_pos[5],move.start_pos[4],move.start_pos[3]], degrees=True)
 
         end_pos = move.end_pos[:3]
-        end_rot = scipy.spatial.transform.Rotation.from_euler('xyz', [move.end_pos[3],move.end_pos[4],move.end_pos[5]], degrees=True)
+        end_rot = scipy.spatial.transform.Rotation.from_euler('ZYX', [move.end_pos[5],move.end_pos[4],move.end_pos[3]], degrees=True)
         
         ffi_main, ffi_lib = chelper.get_ffi()
         for rail in self.kinematics.rails:
