@@ -47,7 +47,7 @@ struct hexapod_stepper {
 /*********** Private helper functions ***********/
 
 // Setter for the hexapod_coord data structure
-void _hexapod_stepper_set_coordinate(double position[3], double orientation[4], struct hexapod_coord *output)
+static void _hexapod_stepper_set_coordinate(double position[3], double orientation[4], struct hexapod_coord *output)
 {
     output->position.x = position[0];
     output->position.y = position[1];
@@ -56,7 +56,7 @@ void _hexapod_stepper_set_coordinate(double position[3], double orientation[4], 
 }
 
 // Return the linear distance between two points
-double _hexapod_stepper_get_distance(struct coord *start_position, struct coord *end_position)
+static double _hexapod_stepper_get_distance(struct coord *start_position, struct coord *end_position)
 {
     double dx = end_position->x - start_position->x;
     double dy = end_position->y - start_position->y;
@@ -66,7 +66,7 @@ double _hexapod_stepper_get_distance(struct coord *start_position, struct coord 
 }
 
 // Rotate the effector and set whether to continue calculations
-void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quaternion *rotation, bool enable)
+static void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quaternion *rotation, bool enable)
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
 

@@ -164,7 +164,8 @@ defs_kin_hexapod = """
     void hexapod_stepper_test_rotation(struct stepper_kinematics *sk);
 
     struct stepper_kinematics *hexapod_stepper_alloc(double arm2
-        , double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z);
+        , struct coord tower, struct coord joint);
+    //    , double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z);
 """
 
 defs_kin_deltesian = """
