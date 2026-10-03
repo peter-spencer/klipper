@@ -319,10 +319,11 @@ class HexapodKinematics:
             for stepper in r.get_steppers():
                 # logging.info("Updating effector: %.3f, %.3f" % (r.__str__(), s.__str__()))
                 sk = stepper.get_stepper_kinematics()
-                ffi_lib.hexapod_set_params(sk, ffi_main.cast("double", j[0]), ffi_main.cast("double", j[1]), ffi_main.cast("double", j[2]))
+                # ffi_lib.hexapod_set_params(sk, ffi_main.cast("double", j[0]), ffi_main.cast("double", j[1]), ffi_main.cast("double", j[2]))
 
         # logging.info("Updated effector angle to %.3f degrees" % (self.offset_angle))
-    
+
+
 ##########################
 
 
@@ -433,6 +434,14 @@ class HexapodRotationAxis:
     
     def get_axis_gcode_id(self):
         return self._gcode_id
+
+class HexapodCoordinates:
+    def __init__(self):
+        pass
+
+class HexapodMove:
+    def __init__(self):
+        pass
 
 # Delta parameter calibration for DELTA_CALIBRATE tool
 class HexapodCalibration:

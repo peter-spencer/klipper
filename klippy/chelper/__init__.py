@@ -6,8 +6,7 @@
 import os, logging
 import cffi
 
-# 'kin_hexapod.c', 'Quaternion.c',
-#     'Quaternion.h'
+
 ######################################################################
 # c_helper.so compiling
 ######################################################################
