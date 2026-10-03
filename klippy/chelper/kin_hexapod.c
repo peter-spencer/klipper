@@ -74,7 +74,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         d.y = ds->end_pos.y - effector_position.y;
         d.z = ds->end_pos.z - effector_position.z;
         
-        t = ds->dist_rot - sqrt(d.x*d.x - d.y*d.y - d.z*d.z);
+        t = ds->dist_rot - sqrt(d.x*d.x + d.y*d.y + d.z*d.z);
         
         // Rotate in proportion to how close to the end position (safe if movement continues)
         if (t <= 0.0) t = 0.0;
