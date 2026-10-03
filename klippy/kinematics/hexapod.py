@@ -347,7 +347,7 @@ class HexapodKinematics:
     # Check that a proposed move will be possible
     def check_move(self, move):
 
-        logging.info("Translation: Process Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
+        logging.info("Translation: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
                         (move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
         logging.info("Dump start position:")
         for d in move.start_pos:
@@ -357,6 +357,19 @@ class HexapodKinematics:
             logging.info("%.3f"%(d))
         logging.info("Translation axis report finished.")
 
+        start_pos = move.start_pos[:3]
+        start_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [move.start_pos[6],move.start_pos[5],move.start_pos[4]], degrees=True)
+
+        end_pos = move.end_pos[:3]
+        end_rot = scipy.spatial.transform.Rotation.from_euler('ZYX', [move.end_pos[6],move.end_pos[5],move.end_pos[4]], degrees=True)
+        
+        ffi_main, ffi_lib = chelper.get_ffi()
+        for rail in self.kinematics.rails:
+            steppers = rail.get_steppers()
+            for stepper in steppers:
+                sk = stepper.get_stepper_kinematics()
+                ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
+                                                      list(end_pos), list(end_rot.as_quat(scalar_first=True)));
 
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
@@ -443,20 +456,6 @@ class HexapodRotationAxis:
         for d in move.end_pos:
             logging.info("%.3f"%(d))
         logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
-
-        start_pos = move.start_pos[:3]
-        start_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [move.start_pos[6],move.start_pos[5],move.start_pos[4]], degrees=True)
-
-        end_pos = move.end_pos[:3]
-        end_rot = scipy.spatial.transform.Rotation.from_euler('ZYX', [move.end_pos[6],move.end_pos[5],move.end_pos[4]], degrees=True)
-        
-        ffi_main, ffi_lib = chelper.get_ffi()
-        for rail in self.kinematics.rails:
-            steppers = rail.get_steppers()
-            for stepper in steppers:
-                sk = stepper.get_stepper_kinematics()
-                ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
-                                                      list(end_pos), list(end_rot.as_quat(scalar_first=True)));
 
     def check_move(self, move, axis_index):
         logging.info("Rotation axis %s: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
