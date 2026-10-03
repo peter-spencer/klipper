@@ -424,6 +424,12 @@ class HexapodRotationAxis:
         self.commanded_pos = self.kinematics.toolhead.commanded_pos[axis_index]
         logging.info("Rotation axis %s: Process Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
                         (self.get_axis_gcode_id(),move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
+        logging.info("Dump start position:")
+        for d in move.start_pos:
+            logging.info("%.3f"%(d))
+        logging.info("Dump end position:")
+        for d in move.end_pos:
+            logging.info("%.3f"%(d))
         logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
 
     def check_move(self, move, axis_index):
