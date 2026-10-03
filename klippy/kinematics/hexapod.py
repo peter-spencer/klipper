@@ -330,7 +330,9 @@ class HexapodKinematics:
     def home(self, homing_state):
         # All axes are homed simultaneously
         homing_state.set_axes([0, 1, 2])
-        forcepos = list(self.home_position)
+        # Klipper natively supports only (X,Y,Z) coordinates
+        forcepos = list(self.home_position)[:3]
+        # This forces the Z value... It's from the Delta code so needs to be changed...
         forcepos[2] = -1.5 * math.sqrt(max(self.arm2)-self.max_xy2)
         homing_state.home_rails(self.rails, forcepos, self.home_position)
 
