@@ -75,11 +75,11 @@ void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quaternion *ro
     
     // Set the current rotation transformation for orienting the effector
     if (rotation != &ds->orientation) {
-        Quaternion_copy(&rotation, &ds->orientation);
+        Quaternion_copy(rotation, &ds->orientation);
     }
 
     // Rotate the joint around the effector datum/origin point
-    Quaternion_rotate(&ds->orientation, ds->joint.axis, &ds->joint_actual);
+    Quaternion_rotate(&ds->orientation, ds->joint.axis, &ds->joint_actual.axis);
 
     // Set movement state going forward
     ds->move.active = enable;
@@ -100,7 +100,7 @@ void __visible hexapod_stepper_clear_rotation(struct stepper_kinematics *sk)
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
     Quaternion_setIdentity(&ds->orientation);
-    _hexapod_stepper_set_rotation(&sk, &ds->orientation, false);
+    _hexapod_stepper_set_rotation(sk, &ds->orientation, false);
 }
 
 // Get the current move command and active status
@@ -123,7 +123,7 @@ void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, 
     _hexapod_stepper_set_coordinate(end_pos, end_rot, &ds->move.end);
 
     // Calculate the linear distance between the start and end points
-    ds->move.distance = _hexapod_stepper_get_distance(&ds->move.start, &ds->move.end);
+    ds->move.distance = _hexapod_stepper_get_distance(&ds->move.start.position, &ds->move.end.position);
     
     // Enable rotation re-calculation
     ds->move.active = true;
@@ -136,7 +136,7 @@ void __visible hexapod_stepper_finish_rotation_move(struct stepper_kinematics *s
 
     // Set the orientation state to be the final orientation
     // transformation and stop the move
-    _hexapod_stepper_set_rotation(&sk, &ds->move.end.orientation, false);
+    _hexapod_stepper_set_rotation(sk, &ds->move.end.orientation, false);
 }
 
 /*********** Public functions for TESTING ONLY ***********/
@@ -144,7 +144,6 @@ void __visible hexapod_stepper_finish_rotation_move(struct stepper_kinematics *s
 // Hard-coded rotation move for testing only
 void __visible hexapod_stepper_test_rotation(struct stepper_kinematics *sk)
 {
-    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
     Quaternion start_orientation, end_orientation;
     double start_rot[4], end_rot[4];
 
