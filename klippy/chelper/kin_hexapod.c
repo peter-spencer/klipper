@@ -39,9 +39,9 @@ struct hexapod_stepper {
 
     /* How to rotate during XYZ move: (start_pos,start_rot) --> (end_pos,end_rot) */
     int enable_rot;
-    struct coord start_pos, end_pos; // Start and end of overall move coordinate
-    double dist2_rot;               // Squared distance to overall move start point
-    Quaternion start_rot, end_rot;  // Initial rotation and Final rotation
+    struct coord start_pos, end_pos;    // Start and end of overall move coordinate
+    double dist_rot;                    // Distance to overall move start point
+    Quaternion start_rot, end_rot;      // Initial rotation and Final rotation
 };
 
 
@@ -74,11 +74,11 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         d.y = ds->end_pos.y - effector_position.y;
         d.z = ds->end_pos.z - effector_position.z;
         
-        t = ds->dist2_rot - d.x*d.x - d.y*d.y - d.z*d.z;
+        t = ds->dist_rot - sqrt(d.x*d.x - d.y*d.y - d.z*d.z);
         
         // Rotate in proportion to how close to the end position (safe if movement continues)
         if (t <= 0.0) t = 0.0;
-        hexapod_stepper_calc_joint(sk, &working, t / ds->dist2_rot);
+        hexapod_stepper_calc_joint(sk, &working, t / ds->dist_rot);
 
     } else {
         working.x = ds->joint.x;
@@ -112,17 +112,17 @@ hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_
     ds->joint.z = joint_z;
 
     ds->enable_rot = true;
-    ds->start_pos.x = 20.0f;
-    ds->start_pos.y = 10.0f;
-    ds->start_pos.z = 50.0f;
-    ds->end_pos.x = 50.0f;
-    ds->end_pos.y = 10.0f;
+    ds->start_pos.x = 0.0f;
+    ds->start_pos.y = 0.0f;
+    ds->start_pos.z = 55.0f;
+    ds->end_pos.x = 0.0f;
+    ds->end_pos.y = 0.0f;
     ds->end_pos.z = 50.0f;
 
     d.x = ds->end_pos.x - ds->start_pos.x;
     d.y = ds->end_pos.y - ds->start_pos.y;
     d.z = ds->end_pos.z - ds->start_pos.z;
-    ds->dist2_rot = d.x*d.x + d.y*d.y + d.z*d.z;
+    ds->dist_rot = sqrt(d.x*d.x + d.y*d.y + d.z*d.z);
     
     Quaternion_fromZRotation(0.0 / 180.0 * 3.141592, &ds->start_rot);
     Quaternion_fromZRotation(15.0 / 180.0 * 3.141592, &ds->end_rot);
