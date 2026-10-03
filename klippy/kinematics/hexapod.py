@@ -227,8 +227,8 @@ class HexapodKinematics:
         # jx, jy, jz = joint
         jx, jy, jz = r.apply(joint)
 
-        return np.array(np.sqrt(arm2 - (tx - jx - x)**2 
-                              - (ty - jy - y)**2) + jz + z).astype(float)
+        return float(np.sqrt(arm2 - (tx - jx - x)**2 
+                              - (ty - jy - y)**2) + jz + z)
 
     # Return a list of stepper positions for the given effector coordinates
     def calc_actuator(self, coordinates):
@@ -240,7 +240,7 @@ class HexapodKinematics:
     # Calculate the cartesian (X,Y,Z,A,B,C) position and orientation of the effector
     # from the positions of the stepper motors
     def calc_position(self, stepper_positions):
-        spos = np.array([stepper_positions[rail.get_name()] for rail in self.rails])
+        spos = [stepper_positions[rail.get_name()] for rail in self.rails]
         return self._actuator_to_cartesian(spos)
 
     # Get the Jacobian matrix for change in stepper positions as a function of effector coordinates
@@ -303,9 +303,8 @@ class HexapodKinematics:
         logging.info("Cartesian coordinates calculated to be (%.3f,%.3f,%.3f) mm, (%.3f,%.3f,%.3f) deg" % (
                 current_guess[0],current_guess[1],current_guess[2],current_guess[3],current_guess[4],current_guess[5]))
 
-        # self.update_effector()
-
-        return current_guess.astype(float).tolist()
+        # Ensure that the result is in native Python float types, not NumPy
+        return [float(coordinate) for coordinate in current_guess]
 
     def update_effector(self):
         # self.offset_angle += 5
