@@ -57,7 +57,7 @@ void hexapod_stepper_calc_joint(struct stepper_kinematics *sk, struct coord *out
     Quaternion_slerp(&ds->start_rot, &ds->end_rot, t, &step_rotation);
 
     // Rotate the joint into position
-    Quaternion_rotate(&step_rotation, &ds->joint.axis, out->axis);
+    Quaternion_rotate(&step_rotation, ds->joint.axis, out->axis);
 }
 
 static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m, double move_time)
