@@ -21,14 +21,15 @@ SOURCE_FILES = [
     'pyhelper.c', 'serialqueue.c', 'stepcompress.c', 'steppersync.c',
     'itersolve.c', 'trapq.c', 'pollreactor.c', 'msgblock.c', 'trdispatch.c',
     'kin_cartesian.c', 'kin_corexy.c', 'kin_corexz.c', 'kin_delta.c',
-    'kin_sliding_parallel.c', 
+    'kin_sliding_parallel.c', 'kin_hexapod.c', 'Quaternion.c',
     'kin_deltesian.c', 'kin_polar.c', 'kin_rotary_delta.c', 'kin_winch.c',
     'kin_extruder.c', 'kin_shaper.c', 'kin_idex.c', 'kin_generic.c'
 ]
 DEST_LIB = "c_helper.so"
 OTHER_FILES = [
     'list.h', 'serialqueue.h', 'stepcompress.h', 'steppersync.h',
-    'itersolve.h', 'pyhelper.h', 'trapq.h', 'pollreactor.h', 'msgblock.h'
+    'itersolve.h', 'pyhelper.h', 'trapq.h', 'pollreactor.h', 'msgblock.h',
+    'Quaternion.h'
 ]
 
 defs_stepcompress = """
@@ -142,31 +143,18 @@ defs_kin_sliding_parallel = """
         , double tower_x, double tower_y, double joint_x, double joint_y, double joint_z);
 """
 
-# defs_kin_hexapod = """
-#     struct hexapod_coord {
-#         struct coord position;      // Position in mm
-#         Quaternion orientation;     // Rotation that orients the effector
-#     };
+defs_kin_hexapod = """
+    void hexapod_stepper_lock_rotation(struct stepper_kinematics *sk);
+    void hexapod_stepper_clear_rotation(struct stepper_kinematics *sk);
+    struct hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_kinematics *sk);
+    void hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, double start_pos[3], double start_rot[4], double end_pos[3], double end_rot[4]);
+    void hexapod_stepper_finish_rotation_move(struct stepper_kinematics *sk);
 
-#     struct hexapod_move {
-#         struct hexapod_coord start; // Start of movement
-#         struct hexapod_coord end;   // End of movement
-#         double distance;            // Linear distance between start and end, cached
-#         bool active;                // Rotational movement, enable the extra calculations
-#     };
+    void hexapod_stepper_test_rotation(struct stepper_kinematics *sk);
 
-#     void hexapod_stepper_lock_rotation(struct stepper_kinematics *sk);
-#     void hexapod_stepper_clear_rotation(struct stepper_kinematics *sk);
-#     struct hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_kinematics *sk);
-#     void hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, double start_pos[3], double start_rot[4], double end_pos[3], double end_rot[4]);
-#     void hexapod_stepper_finish_rotation_move(struct stepper_kinematics *sk);
-
-#     void hexapod_stepper_test_rotation(struct stepper_kinematics *sk);
-
-#     struct stepper_kinematics *hexapod_stepper_alloc(double arm2
-#         , double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z);
-#     //    , struct coord tower, struct coord joint);
-# """
+    struct stepper_kinematics *hexapod_stepper_alloc(double arm2
+        , double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z);
+"""
 
 defs_kin_deltesian = """
     struct stepper_kinematics *deltesian_stepper_alloc(double arm2
@@ -272,7 +260,7 @@ defs_all = [
     defs_kin_cartesian, defs_kin_corexy, defs_kin_corexz, defs_kin_delta,
     defs_kin_deltesian, defs_kin_polar, defs_kin_rotary_delta, defs_kin_winch,
     defs_kin_extruder, defs_kin_shaper, defs_kin_idex,
-    defs_kin_generic_cartesian, defs_kin_sliding_parallel #, defs_kin_hexapod
+    defs_kin_generic_cartesian, defs_kin_sliding_parallel, defs_kin_hexapod
 ]
 
 # Update filenames to an absolute path
