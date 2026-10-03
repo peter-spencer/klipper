@@ -225,10 +225,10 @@ class HexapodKinematics:
         r = scipy.spatial.transform.Rotation.from_euler('xyz', [a,b,c], degrees=True)
 
         # jx, jy, jz = joint
-        [jx, jy, jz] = r.apply(np.array(joint)).astype('float')
+        jx, jy, jz = r.apply(joint)
 
-        return math.sqrt(arm2 - (tx - jx - x)**2 
-                              - (ty - jy - y)**2) + jz + z
+        return np.array(np.sqrt(arm2 - (tx - jx - x)**2 
+                              - (ty - jy - y)**2) + jz + z).astype(float)
 
     # Return a list of stepper positions for the given effector coordinates
     def calc_actuator(self, coordinates):
@@ -300,7 +300,8 @@ class HexapodKinematics:
             # Setup for next iteration
             current_guess = new_guess
 
-        logging.info("Cartesian coordinates calculated to be (%.3f,%.3f,%.3f) mm" % (current_guess[0],current_guess[1],current_guess[2]))
+        logging.info("Cartesian coordinates calculated to be (%.3f,%.3f,%.3f) mm, (%.3f,%.3f,%.3f) deg" % (
+                current_guess[0],current_guess[1],current_guess[2],current_guess[3],current_guess[4],current_guess[5]))
 
         # self.update_effector()
 
