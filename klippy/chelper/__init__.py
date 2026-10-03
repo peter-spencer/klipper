@@ -13,7 +13,7 @@ import cffi
 ######################################################################
 
 GCC_CMD = "gcc"
-COMPILE_ARGS = ("-Wall -g -O2 -shared -fPIC"
+COMPILE_ARGS = ("-v -Wall -g -O2 -shared -fPIC"
                 " -flto -fwhole-program -fno-use-linker-plugin"
                 " -o %s %s > /home/hex/gcc.log 2>&1")
 SSE_FLAGS = "-mfpmath=sse -msse2"
