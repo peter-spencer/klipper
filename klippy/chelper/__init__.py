@@ -143,6 +143,26 @@ defs_kin_sliding_parallel = """
 """
 
 defs_kin_hexapod = """
+    struct hexapod_coord {
+        struct coord position;      // Position in mm
+        Quaternion orientation;     // Rotation that orients the effector
+    };
+
+    struct hexapod_move {
+        struct hexapod_coord start; // Start of movement
+        struct hexapod_coord end;   // End of movement
+        double distance;            // Linear distance between start and end, cached
+        bool active;                // Rotational movement, enable the extra calculations
+    };
+
+    void hexapod_stepper_lock_rotation(struct stepper_kinematics *sk);
+    void hexapod_stepper_clear_rotation(struct stepper_kinematics *sk);
+    struct hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_kinematics *sk);
+    void hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, double start_pos[3], double start_rot[4], double end_pos[3], double end_rot[4]);
+    void hexapod_stepper_finish_rotation_move(struct stepper_kinematics *sk);
+
+    void hexapod_stepper_test_rotation(struct stepper_kinematics *sk);
+
     struct stepper_kinematics *hexapod_stepper_alloc(double arm2
         , double tower_x, double tower_y, double tower_z, double joint_x, double joint_y, double joint_z);
 """
