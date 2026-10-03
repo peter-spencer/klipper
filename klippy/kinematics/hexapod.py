@@ -91,8 +91,6 @@ class HexapodKinematics:
 
         self._calculate_effector_joints()
 
-        self._setup_iterative_solver()
-
         # Calculate the absolute position of each endstop. The normal endstop is the
         # height of the nozzle above the heated bed (in mm), the absolute endstop is
         # that stepper's position along its rail when homed.
@@ -103,6 +101,8 @@ class HexapodKinematics:
         logging.info(
                     "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
                     % (self.abs_endstops[0],self.abs_endstops[1],self.abs_endstops[2],self.abs_endstops[3],self.abs_endstops[4],self.abs_endstops[5]))
+
+        self._setup_iterative_solver()
 
         # Setup boundary checks
         self.need_home = True
