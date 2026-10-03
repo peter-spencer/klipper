@@ -156,11 +156,11 @@ class HexapodKinematics:
         # Why was this here? What did it do?
         # self.set_position([0., 0., 0.], "")
 
-        # # Setup extra axes for rotation control via G1 G-code commands
-        # self.rotations = [ HexapodRotationAxis(self, id) for id in 'ABC' ]
+        # Setup extra axes for rotation control via G1 G-code commands
+        self.rotations = [ HexapodRotationAxis(self, id) for id in 'ABC' ]
 
-        # # Wait for everything to load
-        # config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
+        # Wait for everything to load
+        config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
 
     # Add extra axes to the Toolhead for control over 
     def _add_extra_axes(self):
@@ -311,17 +311,16 @@ class HexapodKinematics:
         # Ensure that the result is in native Python float types, not NumPy
         return [float(coordinate) for coordinate in current_guess]
 
-    def update_effector(self):
-        # self.offset_angle += 5
-        self._calculate_effector_joints(self.offset_angle)
-        ffi_main, ffi_lib = chelper.get_ffi()
-        for r, j in zip(self.rails, self.joints):
-            for stepper in r.get_steppers():
-                # logging.info("Updating effector: %.3f, %.3f" % (r.__str__(), s.__str__()))
-                sk = stepper.get_stepper_kinematics()
-                # ffi_lib.hexapod_set_params(sk, ffi_main.cast("double", j[0]), ffi_main.cast("double", j[1]), ffi_main.cast("double", j[2]))
+    # def update_effector(self):
+    #     # self.offset_angle += 5
+    #     self._calculate_effector_joints(self.offset_angle)
+    #     ffi_main, ffi_lib = chelper.get_ffi()
+    #     for r, j in zip(self.rails, self.joints):
+    #         for stepper in r.get_steppers():
+    #             # logging.info("Updating effector: %.3f, %.3f" % (r.__str__(), s.__str__()))
+    #             sk = stepper.get_stepper_kinematics()
+    #             # ffi_lib.hexapod_set_params(sk, ffi_main.cast("double", j[0]), ffi_main.cast("double", j[1]), ffi_main.cast("double", j[2]))
 
-        # logging.info("Updated effector angle to %.3f degrees" % (self.offset_angle))
 
 
 ##########################
@@ -435,13 +434,10 @@ class HexapodRotationAxis:
     def get_axis_gcode_id(self):
         return self._gcode_id
 
-class HexapodCoordinates:
-    def __init__(self):
-        pass
-
 class HexapodMove:
     def __init__(self):
-        pass
+        self.active = False
+        # self.start_position = 
 
 # Delta parameter calibration for DELTA_CALIBRATE tool
 class HexapodCalibration:
