@@ -432,17 +432,19 @@ class HexapodRotationAxis:
             logging.info("%.3f"%(d))
         logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
 
-        ffi_main, ffi_lib = chelper.get_ffi()
-        sk = stepper.get_stepper_kinematics()
-
         start_pos = move.start_pos[:3]
         start_rot = scipy.spatial.transform.Rotation.from_euler('xyz', [move.start_pos[4],move.start_pos[5],move.start_pos[5]], degrees=True)
 
         end_pos = move.end_pos[:3]
         end_rot = scipy.spatial.transform.Rotation.from_euler('xyz', [move.end_pos[4],move.end_pos[5],move.end_pos[5]], degrees=True)
         
-        ffi_lib.hexapod_stepper_set_rotation_move(sk, start_pos, list(start_rot.as_quat(scalar_first=True)),
-                                                   end_pos, list(end_rot.as_quat(scalar_first=True)));
+        ffi_main, ffi_lib = chelper.get_ffi()
+        for rail in self.kinematics.rails:
+            steppers = rail.get_steppers()
+            for stepper in steppers:
+                sk = stepper.get_stepper_kinematics()
+                ffi_lib.hexapod_stepper_set_rotation_move(sk, start_pos, list(start_rot.as_quat(scalar_first=True)),
+                                                      end_pos, list(end_rot.as_quat(scalar_first=True)));
 
     def check_move(self, move, axis_index):
         logging.info("Rotation axis %s: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
