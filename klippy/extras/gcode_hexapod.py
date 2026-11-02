@@ -3,7 +3,7 @@
 # Copyright (C) 2026  Peter Spencer <peter@quantized.art>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
-import logging, inspect, ast
+import chelper, logging, inspect, ast
 
 class HexapodGCode:
     def __init__(self, config):
@@ -18,6 +18,22 @@ class HexapodGCode:
             cmd = handler[0].removeprefix('gcode_')
             desc = inspect.getdoc(handler[1])
             self.gcode.register_command(cmd, func, False, desc)
+
+    def gcode_FINISH_ROTATION_MOVE(self, gcmd):
+        """Finishes a rotation move and updates stepper kinematics"""
+
+        toolhead = self.printer.lookup_object('toolhead', None)
+        if toolhead is None:
+            raise gcmd.error("Printer not ready")
+        kin = toolhead.get_kinematics()
+        steppers = kin.get_steppers()
+
+        ffi_main, ffi_lib = chelper.get_ffi()
+        for rail in self.rails:
+            steppers = rail.get_steppers()
+            for stepper in steppers:
+                sk = stepper.get_stepper_kinematics()
+                ffi_lib.hexapod_stepper_finish_rotation_move(sk);
 
     def gcode_GET_HEXAPOD_POSITION(self, gcmd):
         """Returns the 6D position of the printer."""
