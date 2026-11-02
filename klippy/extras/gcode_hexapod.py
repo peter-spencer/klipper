@@ -29,11 +29,9 @@ class HexapodGCode:
         steppers = kin.get_steppers()
 
         ffi_main, ffi_lib = chelper.get_ffi()
-        for rail in self.rails:
-            steppers = rail.get_steppers()
-            for stepper in steppers:
-                sk = stepper.get_stepper_kinematics()
-                ffi_lib.hexapod_stepper_finish_rotation_move(sk);
+        for stepper in kin.get_steppers():
+            sk = stepper.get_stepper_kinematics()
+            ffi_lib.hexapod_stepper_finish_rotation_move(sk);
 
     def gcode_GET_HEXAPOD_POSITION(self, gcmd):
         """Returns the 6D position of the printer."""
