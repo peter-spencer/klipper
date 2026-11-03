@@ -341,8 +341,6 @@ class HexapodKinematics:
         forcepos = list(self.home_position)[:3]
         # This forces the Z value... It's from the Delta code so needs to be changed...
         forcepos[2] = -1.5 * math.sqrt(max(self.arm2)-self.max_xy2)
-        # Klipper natively supports only (X,Y,Z) coordinates
-        homing_state.home_rails(self.rails, forcepos, self.home_position[:3])
 
         # Set the rotational axes to the home positions
         for axis, home_angle in zip(self.rotation_axes, self.home_position[3:3+len(self.rotation_axes)]):
@@ -357,6 +355,10 @@ class HexapodKinematics:
             for stepper in r.get_steppers():
                 sk = stepper.get_stepper_kinematics()
                 ffi_lib.hexapod_stepper_set_orientation(sk, list(home_rot.as_quat(scalar_first=True)))
+
+        # Klipper natively supports only (X,Y,Z) coordinates
+        homing_state.home_rails(self.rails, forcepos, self.home_position[:3])
+
 
     # Check that a proposed move will be possible
     def check_move(self, move):
