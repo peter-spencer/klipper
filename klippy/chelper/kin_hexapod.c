@@ -204,7 +204,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
 
                 if (fabs(1.0 - t) < 1e-9) {
                     errorf("Reached the end of the rotation move.");
-                    ds->move.active = false;
+                     _hexapod_stepper_set_rotation(sk, &ds->move.end.orientation, false);
                 }
             //if (t >= 0.0) {
                 // Rotate in proportion to how close the effector is to the end position
