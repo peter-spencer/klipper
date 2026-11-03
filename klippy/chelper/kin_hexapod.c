@@ -235,7 +235,7 @@ hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_
     hexapod_stepper_clear_rotation(&ds->sk);
 
     // Hard coded rotation move for testing only
-    hexapod_stepper_test_rotation(&ds->sk);
+    //hexapod_stepper_test_rotation(&ds->sk);
 
     ds->sk.calc_position_cb = hexapod_stepper_calc_position;
     ds->sk.active_flags = AF_X | AF_Y | AF_Z;
