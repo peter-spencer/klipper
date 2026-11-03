@@ -178,10 +178,11 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
     struct coord effector_position = move_get_coord(m, move_time);
     double t;
 
-    errorf("hexapod_stepper_calc_position: called with struct move->print_time=%f", &m->print_time);
-
     // Execute an active rotation movement
     if(ds->move.active) {
+        
+        errorf("hexapod_stepper_calc_position: called with struct move->print_time=%f", &m->print_time);
+
         // Calculate the "closeness" to the end position:
         // 0 = further away that the start position, 1 = located at the end position
         // This is safe because if movement continues before rotation command is updated there
