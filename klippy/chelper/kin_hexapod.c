@@ -185,22 +185,23 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         // 0 = further away that the start position, 1 = located at the end position
         // This is safe because if movement continues before rotation command is updated there
         // will not be any sudden discontinuous motion.
-        s = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.start.position) / ds->move.distance;
+        //s = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.start.position) / ds->move.distance;
         t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end.position) / ds->move.distance;
 
         ///////////////////
 
-        // Check if this move is in the same direction as the rotation move
-        for( int i = 0 ; i < 3 ; i++ ) {
-            if( fabs(m->axes_r.axis[i] - ds->move.axes_r[i]) > 1e-9 ) {
-                is_rotation_move_vector = false;
-            }
-        }
+        // // Check if this move is in the same direction as the rotation move
+        // for( int i = 0 ; i < 3 ; i++ ) {
+        //     if( fabs(m->axes_r.axis[i] - ds->move.axes_r[i]) > 1e-9 ) {
+        //         is_rotation_move_vector = false;
+        //     }
+        // }
 
         ///////////////////
 
-        if (is_rotation_move_vector) {
-            if (t >= 0.0 && s <= 1.0) {
+        //if (is_rotation_move_vector) {
+            //if (t >= 0.0 && s <= 1.0) {
+            if (t >= 0.0) {
                 // Rotate in proportion to how close the effector is to the end position
                 // Use spherical linear interpolation to get the correct rotation
                 Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
@@ -208,7 +209,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
                 // Rotate the effector
                 _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
             }
-        }
+        //}
     }
 
     // Calculate X,Y,Z offset between effector joint and printer rail
