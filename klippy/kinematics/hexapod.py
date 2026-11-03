@@ -474,10 +474,17 @@ class HexapodRotationAxis:
         # logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),move.end_pos[axis_index]))
 
         ffi_main, ffi_lib = chelper.get_ffi()
-        sk = stepper.get_stepper_kinematics()
-                        
-        if ffi_lib.hexapod_stepper_is_rotation_move(sk):
 
+        proceed_flag = True
+        for rail in self.kinematics.rails:
+            steppers = rail.get_steppers()
+            for stepper in steppers:
+                sk = stepper.get_stepper_kinematics()
+                if ffi_lib.hexapod_stepper_is_rotation_move(sk):
+                    proceed_flag = False
+
+        if not proceed_flag:
+            
             logging.warning("Cannot accept rotation move when one is in the movement queue already.")
             self.kinematics.toolhead.commanded_pos[axis_index] = move.start_pos[axis_index]
 
@@ -492,6 +499,7 @@ class HexapodRotationAxis:
             for rail in self.kinematics.rails:
                 steppers = rail.get_steppers()
                 for stepper in steppers:
+                    sk = stepper.get_stepper_kinematics()
                     ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
                                                     list(end_pos), list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
                     # start_rot = [ffi_lib.hexapod_stepper_get_orientation(sk, i) for i in range(4)]
