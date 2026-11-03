@@ -27,6 +27,7 @@ struct hexapod_coord {
 struct hexapod_move {
     struct hexapod_coord start; // Start of movement
     struct hexapod_coord end;   // End of movement
+    double axes_r[3];           // Vector for linear (X,Y,Z) movement
     double distance;            // Linear distance between start and end, cached
     bool active;                // Rotational movement, enable the extra calculations
 };
@@ -132,12 +133,18 @@ struct __visible hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_
 }
 
 // Setup the rotation movement and activate extra calculations
-void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, double start_pos[3], double start_rot[4], double end_pos[3], double end_rot[4])
+void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, double start_pos[3], double start_rot[4],
+     double end_pos[3], double end_rot[4], double axes_r[3], double start_v, double cruise_v, double accel, double move_time[3])
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
 
     // Disable rotation re-calculation
     ds->move.active = false;
+
+    // Store the move vector, to help identify when to apply rotation
+    for( int i = 0 ; i < 3 ; i++ ) {
+        ds->move.axes_r[i] = axes_r[i];
+    }
 
     // Set the start and end coordinates
     _hexapod_stepper_set_coordinate(start_pos, start_rot, &ds->move.start);
@@ -160,36 +167,6 @@ void __visible hexapod_stepper_finish_rotation_move(struct stepper_kinematics *s
     _hexapod_stepper_set_rotation(sk, &ds->move.end.orientation, false);
 }
 
-/*********** Public functions for TESTING ONLY ***********/
-
-// Hard-coded rotation move for testing only
-void __visible hexapod_stepper_test_rotation(struct stepper_kinematics *sk)
-{
-    Quaternion start_orientation, end_orientation;
-    double start_rot[4], end_rot[4];
-
-    // Set the start and end coordinates
-    double start_position[3] = { 0.0, 0.0, 55.0 };
-    double start_angle = 0.0;
-
-    double end_position[3] = { 0.0, 0.0, 50.0 };
-    double end_angle = 30.0;
-
-    Quaternion_fromZRotation(start_angle / 180.0 * 3.141592, &start_orientation);
-    start_rot[0] = start_orientation.w;
-    start_rot[1] = start_orientation.v[0];
-    start_rot[2] = start_orientation.v[1];
-    start_rot[3] = start_orientation.v[2];
-
-    Quaternion_fromZRotation(end_angle / 180.0 * 3.141592, &end_orientation);
-    end_rot[0] = end_orientation.w;
-    end_rot[1] = end_orientation.v[0];
-    end_rot[2] = end_orientation.v[1];
-    end_rot[3] = end_orientation.v[2];
-
-    hexapod_stepper_set_rotation_move(sk, start_position, start_rot, end_position, end_rot);
-}
-
 /*********** The main kinematics functions for Klipper ***********/
 
 static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m, double move_time)
@@ -197,6 +174,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
     struct coord effector_position = move_get_coord(m, move_time);
     double t;
+    bool is_rotation_move_vector = true;
 
     // Execute an active rotation movement
     if(ds->move.active) {
@@ -209,13 +187,26 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         // will not be any sudden discontinuous motion.
         t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end.position) / ds->move.distance;
 
-        if (t >= 0.0) {
-            // Rotate in proportion to how close the effector is to the end position
-            // Use spherical linear interpolation to get the correct rotation
-            Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
+        ///////////////////
 
-            // Rotate the effector
-            _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
+        // Check if this move is in the same direction as the rotation move
+        for( int i = 0 ; i < 3 ; i++ ) {
+            if( fabs(m->axes_r.axis[i] - ds->move.axes_r[i]) > 1e-9 ) {
+                is_rotation_move_vector = false;
+            }
+        }
+
+        ///////////////////
+
+        if (is_rotation_move_vector) {
+            if (t >= 0.0 && t <= 1.0) {
+                // Rotate in proportion to how close the effector is to the end position
+                // Use spherical linear interpolation to get the correct rotation
+                Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
+
+                // Rotate the effector
+                _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
+            }
         }
     }
 
@@ -253,9 +244,6 @@ hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_
     
     // Setup state information (no rotation)
     hexapod_stepper_clear_rotation(&ds->sk);
-
-    // Hard coded rotation move for testing only
-    //hexapod_stepper_test_rotation(&ds->sk);
 
     ds->sk.calc_position_cb = hexapod_stepper_calc_position;
     ds->sk.active_flags = AF_X | AF_Y | AF_Z;

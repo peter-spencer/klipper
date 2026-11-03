@@ -148,7 +148,9 @@ defs_kin_hexapod = """
     void hexapod_stepper_lock_rotation(struct stepper_kinematics *sk);
     void hexapod_stepper_clear_rotation(struct stepper_kinematics *sk);
     struct hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_kinematics *sk);
-    void hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, double start_pos[3], double start_rot[4], double end_pos[3], double end_rot[4]);
+    void hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, double start_pos[3]
+        , double start_rot[4], double end_pos[3], double end_rot[4], double axes_r[3]
+        , double start_v, double cruise_v, double accel, double move_time[3]));
     void hexapod_stepper_finish_rotation_move(struct stepper_kinematics *sk);
 
     void hexapod_stepper_test_rotation(struct stepper_kinematics *sk);
