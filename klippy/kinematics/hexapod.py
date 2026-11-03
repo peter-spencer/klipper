@@ -166,6 +166,7 @@ class HexapodKinematics:
     def _add_extra_axes(self):
         for rotation in self.rotation_axes:
             self.toolhead.add_extra_axis(rotation, rotation.commanded_pos)
+            rotation.toolhead_axis_id = len(self.toolhead.extra_axes) + 2
             
     def _setup_iterative_solver(self):
         ffi_main, ffi_lib = chelper.get_ffi()
@@ -343,10 +344,14 @@ class HexapodKinematics:
         # Klipper natively supports only (X,Y,Z) coordinates
         homing_state.home_rails(self.rails, forcepos, self.home_position[:3])
 
+        # Set the rotational axes to the home positions
+        for axis, home_angle in zip(self.rotation_axes, self.home_position[3:3+len(self.rotation_axes)]):
+            self.toolhead.commanded_pos[axis.toolhead_axis_id] = home_angle
+                 
         # Transform home angular coordinates from Euler angles into a SciPy Rotation object
         home_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [self.home_position[5],self.home_position[4],self.home_position[3]], degrees=True)
         
-        # Clear all rotational information from the stepper kinematics
+        # Set the rotation of the toolhead in the stepper kinematics
         ffi_main, ffi_lib = chelper.get_ffi()
         for r, j in zip(self.rails, self.joints):
             for stepper in r.get_steppers():
@@ -438,6 +443,9 @@ class HexapodRotationAxis:
 
     def find_past_position(self, print_time):
         return 0.
+
+    def force_pos(self, angle):
+        self.kinematics.toolhead.commanded_pos[axis_index] = angle
 
     def process_move(self, next_move_time, move, axis_index):
         self.commanded_pos = self.kinematics.toolhead.commanded_pos[axis_index]
