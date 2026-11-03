@@ -16,6 +16,7 @@
 #include "compiler.h" // __visible
 #include "itersolve.h" // struct stepper_kinematics
 #include "trapq.h" // move_get_coord
+#include "pyhelper.h" // errorf
 
 // Coordinates to describe the effector orientation at an (X,Y,Z) position
 struct hexapod_coord {
