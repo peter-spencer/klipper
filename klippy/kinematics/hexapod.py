@@ -488,7 +488,7 @@ class HexapodRotationAxis:
                 # ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
                 #                                                         list(end_pos), list(end_rot.as_quat(scalar_first=True)))
                 ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), start_rot, list(end_pos)
-                                , list(end_rot.as_quat(scalar_first=True)), move.axes_r, move.start_v, move.cruise_v, move.accel
+                                , list(end_rot.as_quat(scalar_first=True)), list(move.axes_r), move.start_v, move.cruise_v, move.accel
                                 , list([move.accel_t, move.cruise_t, move.decel_t]))
 
     def get_trapq(self):
