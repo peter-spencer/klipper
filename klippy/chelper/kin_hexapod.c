@@ -185,7 +185,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         // 0 = further away that the start position, 1 = located at the end position
         // This is safe because if movement continues before rotation command is updated there
         // will not be any sudden discontinuous motion.
-        //s = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.start.position) / ds->move.distance;
+        s = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.start.position) / ds->move.distance;
         t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end.position) / ds->move.distance;
 
         ///////////////////
@@ -201,6 +201,10 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
 
         if (is_rotation_move_vector) {
             if (t >= 0.0 && s <= 1.0) {
+
+                if (fabs(1.0 - t) < 1e-9) {
+                    errorf("Reached the end of the rotation move.");
+                }
             //if (t >= 0.0) {
                 // Rotate in proportion to how close the effector is to the end position
                 // Use spherical linear interpolation to get the correct rotation
