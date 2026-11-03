@@ -484,9 +484,9 @@ class HexapodRotationAxis:
             steppers = rail.get_steppers()
             for stepper in steppers:
                 sk = stepper.get_stepper_kinematics()
-                start_rot = [ffi_lib.hexapod_stepper_get_orientation(sk, i) for i in range(4)]
                 ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
                                                                         list(end_pos), list(end_rot.as_quat(scalar_first=True)))
+                # start_rot = [ffi_lib.hexapod_stepper_get_orientation(sk, i) for i in range(4)]
                 # ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), start_rot, list(end_pos)
                 #                 , list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
 
