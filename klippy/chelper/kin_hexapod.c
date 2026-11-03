@@ -86,6 +86,8 @@ static void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quatern
     ds->move.active = enable;
 }
 
+/*********** Public functions for controlling the rotational movement ***********/
+
 // Get the current working coordinates from stepper_kinematics
 double __visible hexapod_stepper_get_orientation(struct stepper_kinematics *sk, uint8_t component)
 {
@@ -98,8 +100,13 @@ double __visible hexapod_stepper_get_orientation(struct stepper_kinematics *sk, 
     }
 }
 
+void __visible hexapod_stepper_set_orientation(struct stepper_kinematics *sk, double orientation[4])
+{
+    Quaternion *rotation;
+    Quaternion_set(orientation[0],orientation[1],orientation[2],orientation[3], rotation);
+    _hexapod_stepper_set_rotation(sk, rotation, false);
+}
 
-/*********** Public functions for controlling the rotational movement ***********/
 
 // Stop the extra calculations
 void __visible hexapod_stepper_lock_rotation(struct stepper_kinematics *sk)

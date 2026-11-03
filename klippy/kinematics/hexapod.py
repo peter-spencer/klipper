@@ -343,6 +343,16 @@ class HexapodKinematics:
         # Klipper natively supports only (X,Y,Z) coordinates
         homing_state.home_rails(self.rails, forcepos, self.home_position[:3])
 
+        # Transform home angular coordinates from Euler angles into a SciPy Rotation object
+        home_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [self.home_position[5],self.home_position[4],self.home_position[3]], degrees=True)
+        
+        # Clear all rotational information from the stepper kinematics
+        ffi_main, ffi_lib = chelper.get_ffi()
+        for r, j in zip(self.rails, self.joints):
+            for stepper in r.get_steppers():
+                sk = stepper.get_stepper_kinematics()
+                ffi_lib.hexapod_stepper_set_orientation(sk, list(home_rot.as_quat(scalar_first=True)))
+
     # Check that a proposed move will be possible
     def check_move(self, move):
 
