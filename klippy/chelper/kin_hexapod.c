@@ -142,9 +142,9 @@ void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, 
     ds->move.active = false;
 
     // Store the move vector, to help identify when to apply rotation
-    //for( int i = 0 ; i < 3 ; i++ ) {
-    //    ds->move.axes_r[i] = axes_r[i];
-    //}
+    for( int i = 0 ; i < 3 ; i++ ) {
+       ds->move.axes_r[i] = axes_r[i];
+    }
 
     // Set the start and end coordinates
     _hexapod_stepper_set_coordinate(start_pos, start_rot, &ds->move.start);
@@ -191,17 +191,17 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         ///////////////////
 
         // // Check if this move is in the same direction as the rotation move
-        // for( int i = 0 ; i < 3 ; i++ ) {
-        //     if( fabs(m->axes_r.axis[i] - ds->move.axes_r[i]) > 1e-9 ) {
-        //         is_rotation_move_vector = false;
-        //     }
-        // }
+        for( int i = 0 ; i < 3 ; i++ ) {
+            if( fabs(m->axes_r.axis[i] - ds->move.axes_r[i]) > 1e-9 ) {
+                is_rotation_move_vector = false;
+            }
+        }
 
         ///////////////////
 
-        //if (is_rotation_move_vector) {
-            //if (t >= 0.0 && s <= 1.0) {
-            if (t >= 0.0) {
+        if (is_rotation_move_vector) {
+            if (t >= 0.0 && s <= 1.0) {
+            //if (t >= 0.0) {
                 // Rotate in proportion to how close the effector is to the end position
                 // Use spherical linear interpolation to get the correct rotation
                 Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
@@ -209,7 +209,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
                 // Rotate the effector
                 _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
             }
-        //}
+        }
     }
 
     // Calculate X,Y,Z offset between effector joint and printer rail
