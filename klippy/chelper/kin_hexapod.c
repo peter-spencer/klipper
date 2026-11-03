@@ -203,7 +203,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
             if (t >= 0.0 && s >= 0.0) {
 
                 if (fabs(1.0 - t) < 1e-9) {
-                    errorf("Reached the end of the rotation move.");
+                    //errorf("Reached the end of the rotation move.");
                      _hexapod_stepper_set_rotation(sk, &ds->move.end.orientation, false);
                 }
             //if (t >= 0.0) {
