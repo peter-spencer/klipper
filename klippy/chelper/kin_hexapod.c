@@ -86,6 +86,19 @@ static void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quatern
     ds->move.active = enable;
 }
 
+// Get the current working coordinates from stepper_kinematics
+double __visible hexapod_stepper_get_orientation(struct stepper_kinematics *sk, uint8_t component)
+{
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+
+    if (component == 0) {
+        return ds->orientation.w;
+    } else {
+        return ds->orientation.v[component-1];
+    }
+}
+
+
 /*********** Public functions for controlling the rotational movement ***********/
 
 // Stop the extra calculations
