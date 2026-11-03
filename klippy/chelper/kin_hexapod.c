@@ -102,9 +102,9 @@ double __visible hexapod_stepper_get_orientation(struct stepper_kinematics *sk, 
 
 void __visible hexapod_stepper_set_orientation(struct stepper_kinematics *sk, double orientation[4])
 {
-    Quaternion *rotation;
-    Quaternion_set(orientation[0],orientation[1],orientation[2],orientation[3], rotation);
-    _hexapod_stepper_set_rotation(sk, rotation, false);
+    Quaternion rotation ;
+    Quaternion_set(orientation[0],orientation[1],orientation[2],orientation[3], &rotation);
+    _hexapod_stepper_set_rotation(sk, &rotation, false);
 }
 
 
