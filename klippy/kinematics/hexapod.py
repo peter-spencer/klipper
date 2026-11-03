@@ -473,22 +473,30 @@ class HexapodRotationAxis:
         # #logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
         # logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),move.end_pos[axis_index]))
 
-        start_pos = move.start_pos[:3]
-        start_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [move.start_pos[6],move.start_pos[5],move.start_pos[4]], degrees=True)
-
-        end_pos = move.end_pos[:3]
-        end_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [move.end_pos[6],move.end_pos[5],move.end_pos[4]], degrees=True)
-        
         ffi_main, ffi_lib = chelper.get_ffi()
-        for rail in self.kinematics.rails:
-            steppers = rail.get_steppers()
-            for stepper in steppers:
-                sk = stepper.get_stepper_kinematics()
-                ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
-                                                list(end_pos), list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
-                # start_rot = [ffi_lib.hexapod_stepper_get_orientation(sk, i) for i in range(4)]
-                # ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), start_rot, list(end_pos)
-                #                 , list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
+        sk = stepper.get_stepper_kinematics()
+                        
+        if ffi_lib.hexapod_stepper_is_rotation_move(sk):
+
+            logging.warning("Cannot accept rotation move when one is in the movement queue already.")
+            self.kinematics.toolhead.commanded_pos[axis_index] = move.start_pos[axis_index]
+
+        else:
+
+            start_pos = move.start_pos[:3]
+            start_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [move.start_pos[6],move.start_pos[5],move.start_pos[4]], degrees=True)
+
+            end_pos = move.end_pos[:3]
+            end_rot = scipy.spatial.transform.Rotation.from_euler('zyx', [move.end_pos[6],move.end_pos[5],move.end_pos[4]], degrees=True)
+            
+            for rail in self.kinematics.rails:
+                steppers = rail.get_steppers()
+                for stepper in steppers:
+                    ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
+                                                    list(end_pos), list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
+                    # start_rot = [ffi_lib.hexapod_stepper_get_orientation(sk, i) for i in range(4)]
+                    # ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), start_rot, list(end_pos)
+                    #                 , list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
 
     def get_trapq(self):
         return None
