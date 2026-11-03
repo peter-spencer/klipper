@@ -142,9 +142,9 @@ void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, 
     ds->move.active = false;
 
     // Store the move vector, to help identify when to apply rotation
-    for( int i = 0 ; i < 3 ; i++ ) {
-        ds->move.axes_r[i] = axes_r[i];
-    }
+    //for( int i = 0 ; i < 3 ; i++ ) {
+    //    ds->move.axes_r[i] = axes_r[i];
+    //}
 
     // Set the start and end coordinates
     _hexapod_stepper_set_coordinate(start_pos, start_rot, &ds->move.start);
