@@ -143,7 +143,7 @@ defs_kin_sliding_parallel = """
 """
 
 defs_kin_hexapod = """
-    double hexapod_stepper_get_orientation(struct stepper_kinematics *sk, uint8_t component)
+    double hexapod_stepper_get_orientation(struct stepper_kinematics *sk, uint8_t component);
     void hexapod_stepper_lock_rotation(struct stepper_kinematics *sk);
     void hexapod_stepper_clear_rotation(struct stepper_kinematics *sk);
     struct hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_kinematics *sk);
