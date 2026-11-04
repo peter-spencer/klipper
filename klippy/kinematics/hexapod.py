@@ -490,7 +490,7 @@ class HexapodRotationAxis:
 
                 # Reset the angles
                 new_end_pos = list(move.end_pos)
-                for axis in self.rotation_axes:
+                for axis in self.kinematics.rotation_axes:
                     i = axis.toolhead_axis_id
                     new_end_pos[i] = move.start_pos[i]
                 move.end_pos = tuple(new_end_pos)
