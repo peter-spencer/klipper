@@ -478,13 +478,16 @@ class HexapodRotationAxis:
         # Set up rotation if this is the last axis
         if self is self.kinematics.rotation_axes[-1]:
 
-            proceed_flag = True
+            proceed_flag = False
             for rail in self.kinematics.rails:
                 steppers = rail.get_steppers()
                 for stepper in steppers:
                     sk = stepper.get_stepper_kinematics()
-                    if ffi_lib.hexapod_stepper_is_rotation_move(sk):
-                        proceed_flag = False
+                    if not ffi_lib.hexapod_stepper_is_rotation_move(sk):
+                        proceed_flag = True
+                        logging.info("Stepper axis movement OFF.")
+                    else:
+                        logging.info("Stepper axis movement ON.")
 
             if not proceed_flag:
 
