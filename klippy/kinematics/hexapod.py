@@ -485,6 +485,9 @@ class HexapodRotationAxis:
 
         if not proceed_flag:
 
+            # Reset the angle
+            move.end_pos[axis_index] = move.start_pos[axis_index]
+
             logging.warning("Cannot accept rotation move when one is in the movement queue already.")
             #self.kinematics.toolhead.commanded_pos[axis_index] = move.start_pos[axis_index]
             move.move_error("Cannot schedule more than one rotation move")
