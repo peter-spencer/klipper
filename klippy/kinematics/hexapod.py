@@ -475,8 +475,14 @@ class HexapodRotationAxis:
 
         ffi_main, ffi_lib = chelper.get_ffi()
 
+        # Get the last rotation axis in this movement
+        last_axis = None
+        for i in range(4,len(self.kinematics.rotation_axes)+4):
+            if move.axes_d[i]:
+                last_axis = self.kinematics.rotation_axes[i-4]
+
         # Set up rotation if this is the last axis
-        if self is self.kinematics.rotation_axes[-1]:
+        if self is last_axis:
 
             proceed_flag = False
             for rail in self.kinematics.rails:
