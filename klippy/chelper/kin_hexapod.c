@@ -208,17 +208,18 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         if (is_rotation_move_vector) {
             if (t >= 0.0 && s >= 0.0) {
 
-                if (fabs(1.0 - t) < 1e-3) {
+                if (fabs(1.0 - t) < 1e-9) {
                     errorf("Reached the end of the rotation move.");
-                     _hexapod_stepper_set_rotation(sk, &ds->move.end.orientation, false);
-                }
-            //if (t >= 0.0) {
-                // Rotate in proportion to how close the effector is to the end position
-                // Use spherical linear interpolation to get the correct rotation
-                Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
+                    _hexapod_stepper_set_rotation(sk, &ds->move.end.orientation, false);
+                } else {
+                //if (t >= 0.0) {
+                    // Rotate in proportion to how close the effector is to the end position
+                    // Use spherical linear interpolation to get the correct rotation
+                    Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
 
-                // Rotate the effector
-                _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
+                    // Rotate the effector
+                    _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
+                }
             }
         }
     }
