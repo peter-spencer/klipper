@@ -363,15 +363,15 @@ class HexapodKinematics:
     # Check that a proposed move will be possible
     def check_move(self, move):
 
-        logging.info("Translation: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
-                        (move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
-        logging.info("Dump start position:")
-        for d in move.start_pos:
-            logging.info("%.3f"%(d))
-        logging.info("Dump end position:")
-        for d in move.end_pos:
-            logging.info("%.3f"%(d))
-        logging.info("Translation axes report finished.")
+        # logging.info("Translation: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
+        #                 (move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
+        # logging.info("Dump start position:")
+        # for d in move.start_pos:
+        #     logging.info("%.3f"%(d))
+        # logging.info("Dump end position:")
+        # for d in move.end_pos:
+        #     logging.info("%.3f"%(d))
+        # logging.info("Translation axes report finished.")
 
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
@@ -462,16 +462,16 @@ class HexapodRotationAxis:
         # logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),move.end_pos[axis_index]))
 
     def check_move(self, move, axis_index):
-        logging.info("Rotation axis %s: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
-                        (self.get_axis_gcode_id(),move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
-        logging.info("Dump start position:")
-        for d in move.start_pos:
-            logging.info("%.3f"%(d))
-        logging.info("Dump end position:")
-        for d in move.end_pos:
-            logging.info("%.3f"%(d))
-        #logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
-        logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),move.end_pos[axis_index]))
+        # logging.info("Rotation axis %s: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
+        #                 (self.get_axis_gcode_id(),move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
+        # logging.info("Dump start position:")
+        # for d in move.start_pos:
+        #     logging.info("%.3f"%(d))
+        # logging.info("Dump end position:")
+        # for d in move.end_pos:
+        #     logging.info("%.3f"%(d))
+        # #logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
+        # logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),move.end_pos[axis_index]))
 
         ffi_main, ffi_lib = chelper.get_ffi()
 
@@ -491,12 +491,12 @@ class HexapodRotationAxis:
                     sk = stepper.get_stepper_kinematics()
                     if ffi_lib.hexapod_stepper_is_rotation_move(sk):
                         proceed_flag = False
-                        logging.info("Stepper axis movement ON, this extra rotation move will be rejected.")
-                    else:
-                        logging.info("Stepper axis movement OFF.")
+                    #     logging.info("Stepper axis movement ON, this extra rotation move will be rejected.")
+                    # else:
+                    #     logging.info("Stepper axis movement OFF.")
 
             if not move.is_kinematic_move:
-               logging.info("Attempted rotation without (X,Y,Z) travel and this is not supported yet.")
+               # logging.info("Attempted rotation without (X,Y,Z) travel and this is not supported yet.")
                proceed_flag = False
 
             if not proceed_flag:
