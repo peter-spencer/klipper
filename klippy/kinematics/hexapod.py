@@ -484,16 +484,20 @@ class HexapodRotationAxis:
         # Set up rotation if this is the last axis
         if self is last_axis:
 
-            proceed_flag = False
+            proceed_flag = True
             for rail in self.kinematics.rails:
                 steppers = rail.get_steppers()
                 for stepper in steppers:
                     sk = stepper.get_stepper_kinematics()
-                    if not ffi_lib.hexapod_stepper_is_rotation_move(sk):
-                        proceed_flag = True
-                        logging.info("Stepper axis movement OFF.")
+                    if ffi_lib.hexapod_stepper_is_rotation_move(sk):
+                        proceed_flag = False
+                        logging.info("Stepper axis movement ON, this extra rotation move will be rejected.")
                     else:
-                        logging.info("Stepper axis movement ON.")
+                        logging.info("Stepper axis movement OFF.")
+
+            if not move.is_kinematic_move:
+               logging.info("Attempted rotation without (X,Y,Z) travel and this is not supported yet.")
+               proceed_flag = False
 
             if not proceed_flag:
 
@@ -504,9 +508,9 @@ class HexapodRotationAxis:
                     new_end_pos[i] = move.start_pos[i]
                 move.end_pos = tuple(new_end_pos)
 
-                logging.warning("Cannot accept rotation move when one is in the movement queue already.")
+                logging.warning("Could not accept rotation move.")
                 #self.kinematics.toolhead.commanded_pos[axis_index] = move.start_pos[axis_index]
-                move.move_error("Cannot schedule more than one rotation move")
+                move.move_error("Could not accept rotation move")
 
             else:
 
