@@ -135,7 +135,7 @@ struct __visible hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_
 bool __visible hexapod_stepper_is_rotation_move(struct stepper_kinematics *sk)
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
-    return &ds->move.active;
+    return ds->move.active;
 }
 
 // Setup the rotation movement and activate extra calculations
