@@ -265,8 +265,8 @@ class HexapodKinematics:
     # Calculate the cartesian coordinates for a given set of stepper positions
     def _actuator_to_cartesian(self, spos, initial_guess=None):
         max_iterations = 100
-        convergence = 1e-10
-
+        convergence = 1e-5
+        
         logging.info("Forward Kinematics starting, solving for stepper positions (%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) mm..."
                       % (spos[0],spos[1],spos[2],spos[3],spos[4],spos[5]))
 
