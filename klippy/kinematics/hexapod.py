@@ -7,7 +7,6 @@
 #  - Add a safety net for the Newton solver to stop it trying mathematically impossible solutions, or going out of bounds at all
 #  - check_move() to be improved
 #  - Is it worthwhile to have a more rigorous stepper speed check and movement slowing?
-#  - IMPLEMENT STATIC ROTATIONS OF THE EFFECTOR
 #  - longer term: DYNAMIC ROTATIONS (extra axes, iterative solver access?, accessible print areas and checks)
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
@@ -34,74 +33,23 @@ class HexapodKinematics:
         except:
             raise config.error("Hexapod kinematics requires the SciPy module")
 
-        # Setup tower rails
-        stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
-
-        # Remember the toolhead and config (DOES DOING THIS BREAK ANYTHING LATER????)
+        # Remember the toolhead and config
         self.toolhead = toolhead
         self.config = config
-        self.stepper_configs = stepper_configs
+        self.stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
 
-        # Load the first rail, stepper_a
-        rail_a = stepper.LookupMultiRail(stepper_configs[0], need_position_minmax = False)
-
-        # There must be an endstop specified for at least this first rail,
-        # this will be the default endstop for the other rails.
-        default_endstop = rail_a.get_homing_info().position_endstop
-
-        # Load the rest of the rails
-        self.rails = [rail_a] + [stepper.LookupMultiRail(stepper_config, need_position_minmax = False,
-            default_position_endstop=default_endstop) for stepper_config in stepper_configs[1:]]
-
-        # Setup max velocity
-        self.max_velocity, self.max_accel = self.toolhead.get_max_velocity()
-        self.max_z_velocity = config.getfloat(
-            'max_z_velocity', self.max_velocity,
-            above=0., maxval=self.max_velocity)
-        self.max_z_accel = config.getfloat('max_z_accel', self.max_accel,
-                                            above=0., maxval=self.max_accel)
-        
-        # Read radius and arm lengths
-        self.radius = radius = config.getfloat('delta_radius', above=0.)
-        print_radius = config.getfloat('print_radius', radius, above=0.)
-        arm_length_a = stepper_configs[0].getfloat('arm_length', above=radius)
-        self.arm_lengths = [sconfig.getfloat('arm_length', arm_length_a, above=radius)
-                            for sconfig in stepper_configs]
-
-        # Store the squared length of the printer's arms to save on calculation time
-        self.arm2 = np.square(self.arm_lengths)
-        
-        # Determine tower locations in cartesian space
-        # First get simple or default spacings
-        a = config.getfloat('tower_pair_start', 210.)                 # Angle of the centre of the first pair (angle in degrees)
-        b = config.getfloat('tower_pair_spacing', 120., above=0.)     # Spacing between centre of each pair (angle in degrees)
-        c = config.getfloat('tower_pair_gap', 20., above=0.) / 2      # Gap between each pair (angle in degrees)
-        default_tower_angles = [ (a-c)%360.0, (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0 ]
-
-        # Now calculate the specific angles and positions of the towers
-        self.angles = [sconfig.getfloat('angle', angle)
-                       for sconfig, angle in zip(stepper_configs, default_tower_angles)]
-        self.towers = [(math.cos(math.radians(angle)) * radius,
-                        math.sin(math.radians(angle)) * radius)
-                       for angle in self.angles]
-
-        logging.info(
-                    "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
-                    % (self.angles[0],self.angles[1],self.angles[2],self.angles[3],self.angles[4],self.angles[5]))
-
+        # Setup the 3D printer geometry
+        self._calculate_tower_rails()
         self._calculate_effector_joints()
+        self._calculate_endstops()
+        
+        # Setup extra axes for rotation control via G1 G-code commands
+        self.rotation_axes = [ HexapodRotationAxis(self, id) for id in 'ABC' ]
 
-        # Calculate the absolute position of each endstop. The normal endstop is the
-        # height of the nozzle above the heated bed (in mm), the absolute endstop is
-        # that stepper's position along its rail when homed.
-        self.endstops = [rail.get_homing_info().position_endstop for rail in self.rails]
-        self.abs_endstops = [self._cartesian_to_actuator((0., 0., endstop, 0., 0., 0.), arm2, tower, joint)
-                             for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)]
+        # Wait for everything to load so that Toolhead is ready to accept extra axes
+        config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
 
-        logging.info(
-                    "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
-                    % (self.abs_endstops[0],self.abs_endstops[1],self.abs_endstops[2],self.abs_endstops[3],self.abs_endstops[4],self.abs_endstops[5]))
-
+        # Setup the iterative solver for determining stepper pulse timing
         self._setup_iterative_solver()
 
         # Setup boundary checks
@@ -130,24 +78,17 @@ class HexapodKinematics:
         
         # Find the point where an XY move could result in excessive
         # tower movement
-        half_min_step_dist = min([r.get_steppers()[0].get_step_dist()
-                                  for r in self.rails]) * .5
+        half_min_step_dist = min([r.get_steppers()[0].get_step_dist() for r in self.rails]) * .5
 
         def ratio_to_xy(ratio):
-            return (ratio * math.sqrt(min_arm_length**2 / (ratio**2 + 1.)
-                                      - half_min_step_dist**2)
-                    + half_min_step_dist - radius)
+            return (ratio * math.sqrt(min_arm_length**2 / (ratio**2 + 1.) - half_min_step_dist**2) + half_min_step_dist - self.radius)
 
         self.slow_xy2 = ratio_to_xy(SLOW_RATIO)**2
         self.very_slow_xy2 = ratio_to_xy(2. * SLOW_RATIO)**2
-        self.max_xy2 = min(print_radius, min_arm_length - radius,
-                           ratio_to_xy(4. * SLOW_RATIO))**2
+        self.max_xy2 = min(self.print_radius, min_arm_length - self.radius, ratio_to_xy(4. * SLOW_RATIO))**2
         max_xy = math.sqrt(self.max_xy2)
 
-        logging.info("Hex max build radius %.2fmm (moves slowed past %.2fmm"
-                     " and %.2fmm)"
-                     % (max_xy, math.sqrt(self.slow_xy2),
-                        math.sqrt(self.very_slow_xy2)))
+        logging.info("Hex max build radius %.2fmm (moves slowed past %.2fmm and %.2fmm)" % (max_xy, math.sqrt(self.slow_xy2), math.sqrt(self.very_slow_xy2)))
 
         # Set minium and maximum axes positions to define allowed build volume
         self.axes_min = self.toolhead.Coord((-max_xy, -max_xy, self.min_z))
@@ -156,11 +97,6 @@ class HexapodKinematics:
         # Why was this here? What did it do?
         # self.set_position([0., 0., 0.], "")
 
-        # Setup extra axes for rotation control via G1 G-code commands
-        self.rotation_axes = [ HexapodRotationAxis(self, id) for id in 'ABC' ]
-
-        # Wait for everything to load
-        config.get_printer().register_event_handler("klippy:mcu_identify", self._add_extra_axes)
 
     # Add extra axes to the Toolhead for control over 
     def _add_extra_axes(self):
@@ -174,13 +110,66 @@ class HexapodKinematics:
         # Setup the iterative solver (for converting XYZ move into stepper movements)
         for r, a, t, es, j in zip(self.rails, self.arm2, self.towers, self.abs_endstops, self.joints):
             r.setup_itersolve('hexapod_stepper_alloc', a, t[0], t[1], es, j[0], j[1], j[2])
-            # b = ffi_main.new("struct coord", [t[0], t[1], es])
-            # c = ffi_main.new("struct coord", list(j))
-            # r.setup_itersolve('hexapod_stepper_alloc', a, b, c)
         
         # Setup trapezoidal generator / look-ahead queue
         for s in self.get_steppers():
             s.set_trapq(self.toolhead.get_trapq())
+
+    def _calculate_endstops(self):
+        # Calculate the absolute position of each endstop. The normal endstop is the
+        # height of the nozzle above the heated bed (in mm), the absolute endstop is
+        # that stepper's position along its rail when homed.
+        self.endstops = [rail.get_homing_info().position_endstop for rail in self.rails]
+        self.abs_endstops = [self._cartesian_to_actuator((0., 0., endstop, 0., 0., 0.), arm2, tower, joint)
+                                for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)]
+
+        logging.info(
+                    "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
+                    % (self.abs_endstops[0],self.abs_endstops[1],self.abs_endstops[2],self.abs_endstops[3],self.abs_endstops[4],self.abs_endstops[5]))
+
+    def _calculate_tower_rails(self):
+        # Load the first rail, stepper_a
+        rail_a = stepper.LookupMultiRail(self.stepper_configs[0], need_position_minmax = False)
+
+        # There must be an endstop specified for at least this first rail,
+        # this will be the default endstop for the other rails.
+        default_endstop = rail_a.get_homing_info().position_endstop
+
+        # Load the rest of the rails
+        self.rails = [rail_a] + [stepper.LookupMultiRail(stepper_config, need_position_minmax = False,
+            default_position_endstop=default_endstop) for stepper_config in self.stepper_configs[1:]]
+
+        # Setup max velocity
+        self.max_velocity, self.max_accel = self.toolhead.get_max_velocity()
+        self.max_z_velocity = self.config.getfloat('max_z_velocity', self.max_velocity, above=0., maxval=self.max_velocity)
+        self.max_z_accel = self.config.getfloat('max_z_accel', self.max_accel, above=0., maxval=self.max_accel)
+        
+        # Read radius and arm lengths
+        self.radius = self.config.getfloat('delta_radius', above=0.)
+        self.print_radius = self.config.getfloat('print_radius', self.radius, above=0.)
+        arm_length_a = self.stepper_configs[0].getfloat('arm_length', above=self.radius)
+        self.arm_lengths = [sconfig.getfloat('arm_length', arm_length_a, above=self.radius) for sconfig in self.stepper_configs]
+
+        # Store the squared length of the printer's arms to save on calculation time
+        self.arm2 = np.square(self.arm_lengths)
+        
+        # Determine tower locations in cartesian space
+        # First get simple or default spacings
+        a = self.config.getfloat('tower_pair_start', 210.)                 # Angle of the centre of the first pair (angle in degrees)
+        b = self.config.getfloat('tower_pair_spacing', 120., above=0.)     # Spacing between centre of each pair (angle in degrees)
+        c = self.config.getfloat('tower_pair_gap', 20., above=0.) / 2      # Gap between each pair (angle in degrees)
+        default_tower_angles = [ (a-c)%360.0, (a+c)%360.0, (a+b-c)%360.0, (a+b+c)%360.0, (a+2*b-c)%360.0, (a+2*b+c)%360.0 ]
+
+        # Now calculate the specific angles and positions of the towers
+        self.angles = [sconfig.getfloat('angle', angle)
+                        for sconfig, angle in zip(self.stepper_configs, default_tower_angles)]
+        self.towers = [(math.cos(math.radians(angle)) * self.radius,
+                        math.sin(math.radians(angle)) * self.radius)
+                        for angle in self.angles]
+
+        logging.info(
+                    "Axis tower angles: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f degrees"
+                    % (self.angles[0],self.angles[1],self.angles[2],self.angles[3],self.angles[4],self.angles[5]))
 
     def _calculate_effector_joints(self, offset_angle = 0):
         self.offset_angle = offset_angle
@@ -229,9 +218,8 @@ class HexapodKinematics:
         # 3D positions without orientation
         x, y, z, a, b, c = coordinates
 
-        r = scipy.spatial.transform.Rotation.from_euler('xyz', [a,b,c], degrees=True)
+        r = scipy.spatial.transform.Rotation.from_euler('zyx', [c,b,a], degrees=True)
 
-        # jx, jy, jz = joint
         jx, jy, jz = r.apply(joint)
 
         return float(np.sqrt(arm2 - (tx - jx - x)**2 
@@ -313,17 +301,6 @@ class HexapodKinematics:
         # Ensure that the result is in native Python float types, not NumPy
         return [float(coordinate) for coordinate in current_guess]
 
-    # def update_effector(self):
-    #     # self.offset_angle += 5
-    #     self._calculate_effector_joints(self.offset_angle)
-    #     ffi_main, ffi_lib = chelper.get_ffi()
-    #     for r, j in zip(self.rails, self.joints):
-    #         for stepper in r.get_steppers():
-    #             # logging.info("Updating effector: %.3f, %.3f" % (r.__str__(), s.__str__()))
-    #             sk = stepper.get_stepper_kinematics()
-    #             # ffi_lib.hexapod_set_params(sk, ffi_main.cast("double", j[0]), ffi_main.cast("double", j[1]), ffi_main.cast("double", j[2]))
-
-
 
 ##########################
 
@@ -334,6 +311,7 @@ class HexapodKinematics:
         if clear_axes:
             self.limit_xy2 = -1
             self.need_home = True
+
     def home(self, homing_state):
         # All axes are homed simultaneously
         homing_state.set_axes([0, 1, 2])
@@ -362,17 +340,6 @@ class HexapodKinematics:
 
     # Check that a proposed move will be possible
     def check_move(self, move):
-
-        # logging.info("Translation: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
-        #                 (move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
-        # logging.info("Dump start position:")
-        # for d in move.start_pos:
-        #     logging.info("%.3f"%(d))
-        # logging.info("Dump end position:")
-        # for d in move.end_pos:
-        #     logging.info("%.3f"%(d))
-        # logging.info("Translation axes report finished.")
-
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
 
@@ -449,30 +416,8 @@ class HexapodRotationAxis:
     # Called after (X,Y,Z) move has already been added to the trapezoidal queue (too late to reliably influence iterative solver).
     def process_move(self, next_move_time, move, axis_index):
         self.commanded_pos = self.kinematics.toolhead.commanded_pos[axis_index]
-        # logging.info("Rotation axis %s: Process Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
-        #                 (self.get_axis_gcode_id(),move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
-        # logging.info("Print time given: %f"%(next_move_time))
-        # logging.info("Dump start position:")
-        # for d in move.start_pos:
-        #     logging.info("%.3f"%(d))
-        # logging.info("Dump end position:")
-        # for d in move.end_pos:
-        #     logging.info("%.3f"%(d))
-        # #logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
-        # logging.info("Rotation axis %s: Process Move to %.3f degrees" % (self.get_axis_gcode_id(),move.end_pos[axis_index]))
 
     def check_move(self, move, axis_index):
-        # logging.info("Rotation axis %s: Check Move from (%.3f,%.3f,%.3f) to (%.3f,%.3f,%.3f) mm" %
-        #                 (self.get_axis_gcode_id(),move.start_pos[0],move.start_pos[1],move.start_pos[2],move.end_pos[0],move.end_pos[1],move.end_pos[2]))
-        # logging.info("Dump start position:")
-        # for d in move.start_pos:
-        #     logging.info("%.3f"%(d))
-        # logging.info("Dump end position:")
-        # for d in move.end_pos:
-        #     logging.info("%.3f"%(d))
-        # #logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),self.kinematics.toolhead.commanded_pos[axis_index]))
-        # logging.info("Rotation axis %s: Check Move to %.3f degrees" % (self.get_axis_gcode_id(),move.end_pos[axis_index]))
-
         ffi_main, ffi_lib = chelper.get_ffi()
 
         # Get the last rotation axis in this movement
@@ -484,22 +429,22 @@ class HexapodRotationAxis:
         # Set up rotation if this is the last axis
         if self is last_axis:
 
-            proceed_flag = True
+            move._hexapod_proceed_flag = True
             for rail in self.kinematics.rails:
                 steppers = rail.get_steppers()
                 for stepper in steppers:
                     sk = stepper.get_stepper_kinematics()
                     if ffi_lib.hexapod_stepper_is_rotation_move(sk):
-                        proceed_flag = False
+                        move._hexapod_proceed_flag = False
                     #     logging.info("Stepper axis movement ON, this extra rotation move will be rejected.")
                     # else:
                     #     logging.info("Stepper axis movement OFF.")
 
             if not move.is_kinematic_move:
                # logging.info("Attempted rotation without (X,Y,Z) travel and this is not supported yet.")
-               proceed_flag = False
+               move._hexapod_proceed_flag = False
 
-            if not proceed_flag:
+            if not move._hexapod_proceed_flag:
 
                 # Reset the angles
                 new_end_pos = list(move.end_pos)
@@ -509,7 +454,6 @@ class HexapodRotationAxis:
                 move.end_pos = tuple(new_end_pos)
 
                 logging.warning("Could not accept rotation move.")
-                #self.kinematics.toolhead.commanded_pos[axis_index] = move.start_pos[axis_index]
                 move.move_error("Could not accept rotation move")
 
             else:
@@ -526,9 +470,6 @@ class HexapodRotationAxis:
                         sk = stepper.get_stepper_kinematics()
                         ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), list(start_rot.as_quat(scalar_first=True)),
                                                         list(end_pos), list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
-                        # start_rot = [ffi_lib.hexapod_stepper_get_orientation(sk, i) for i in range(4)]
-                        # ffi_lib.hexapod_stepper_set_rotation_move(sk, list(start_pos), start_rot, list(end_pos)
-                        #                 , list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
 
     def get_trapq(self):
         return None
