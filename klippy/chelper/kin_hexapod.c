@@ -182,8 +182,13 @@ void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, 
     _hexapod_stepper_set_coordinate(end_pos, end_rot, &ds->move.end);
 
     // Calculate the linear distance between the start and end points
-    ds->move.distance_r = _hexapod_stepper_get_distance(&ds->move.start.position, &ds->move.end.position);
+    ds->move.distance_r = 1.0 / _hexapod_stepper_get_distance(&ds->move.start.position, &ds->move.end.position);
     
+    // Clear metadata
+    ds->last_seen_print_time = -1.0;
+    ds->last_seen_move_timeA = -1.0;
+    ds->last_seen_move_timeB = -1.0;
+
     // Enable rotation re-calculation
     ds->move.armed = true;
 }
@@ -300,6 +305,10 @@ hexapod_stepper_alloc(double arm2, double tower_x, double tower_y, double tower_
     ds->joint.x = joint_x;
     ds->joint.y = joint_y;
     ds->joint.z = joint_z;
+
+    ds->last_seen_print_time = -1.0;
+    ds->last_seen_move_timeA = -1.0;
+    ds->last_seen_move_timeB = -1.0;
     
     // Setup state information (no rotation)
     hexapod_stepper_clear_rotation(&ds->sk);
