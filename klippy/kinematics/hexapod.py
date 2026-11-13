@@ -442,9 +442,9 @@ class HexapodRotationAxis:
                     for stepper in steppers:
                         sk = stepper.get_stepper_kinematics()
                         if ffi_lib.hexapod_stepper_is_rotation_move(sk):
-                            logging.info("%s: Logged last print time from move struct = %g" % (stepper.name, ffi_lib.hexapod_stepper_get_last_print_time(sk)))
-                            logging.info("%s: Logged last move time from move struct = %g" % (stepper.name, ffi_lib.hexapod_stepper_get_last_move_timeA(sk)))
-                            logging.info("%s: Logged last move time for calculation = %g" % (stepper.name, ffi_lib.hexapod_stepper_get_last_move_timeB(sk)))
+                            logging.info("%s: Logged last print time from move struct = %g" % (stepper.get_name(), ffi_lib.hexapod_stepper_get_last_print_time(sk)))
+                            logging.info("%s: Logged last move time from move struct = %g" % (stepper.get_name(), ffi_lib.hexapod_stepper_get_last_move_timeA(sk)))
+                            logging.info("%s: Logged last move time for calculation = %g" % (stepper.get_name(), ffi_lib.hexapod_stepper_get_last_move_timeB(sk)))
 
                             move._hexapod_proceed_flag = False
                         #     logging.info("Stepper axis movement ON, this extra rotation move will be rejected.")
