@@ -256,6 +256,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
         if( isnan(t) ) {
             ds->move.active = false;
         } else {
+            errorf("rotating: %f", t);
             // Rotate in proportion to how close the effector is to the end position
             // Use spherical linear interpolation to get the correct rotation
             Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
