@@ -218,7 +218,7 @@ static bool _hexapod_are_unit_vectors_equal(struct coord a, struct coord b) {
     return 1.0 - dot < epsilon && dot > 0.0 - epsilon;
 }
 
-bool _hexapod_get_move_fraction(struct stepper_kinematics *sk, struct move *m, struct coord effector_position) {
+double _hexapod_get_move_fraction(struct stepper_kinematics *sk, struct coord *effector_position) {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
     double s, t;
 
@@ -226,8 +226,8 @@ bool _hexapod_get_move_fraction(struct stepper_kinematics *sk, struct move *m, s
     // 0 = further away that the start position, 1 = located at the end position
     // This is safe because if movement continues before rotation command is updated there
     // will not be any sudden discontinuous motion.
-    s = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.start.position) * ds->move.distance_r;
-    t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end.position) * ds->move.distance_r;
+    s = 1.0 - _hexapod_stepper_get_distance(effector_position, &ds->move.start.position) * ds->move.distance_r;
+    t = 1.0 - _hexapod_stepper_get_distance(effector_position, &ds->move.end.position) * ds->move.distance_r;
 
     if (t >= 0.0 && s >= 0.0) {
         return t;
@@ -250,7 +250,7 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
 
     if( ds->move.active ) {
         // Check if this trapq move is between the start and end positions for the rotational move
-        t = _hexapod_get_move_fraction(sk, m, effector_position);
+        t = _hexapod_get_move_fraction(sk, &effector_position);
 
         // t is NaN if the current position is not between the start and end positions
         if( isnan(t) ) {
