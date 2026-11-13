@@ -27,9 +27,9 @@ struct hexapod_coord {
 struct hexapod_move {
     struct hexapod_coord start; // Start of movement
     struct hexapod_coord end;   // End of movement
-    double axes_r[3];           // Vector for linear (X,Y,Z) movement
-    double distance;            // Linear distance between start and end, cached
-    bool active;                // Rotational movement, enable the extra calculations
+    struct coord axes_r;        // Normalised vector for linear (X,Y,Z) movement
+    double distance_r;          // Repicrocal of the distance between start and end, cached
+    bool armed, active;         // Rotational movement, enable the extra calculations
 };
 
 struct hexapod_stepper {
@@ -44,6 +44,9 @@ struct hexapod_stepper {
     struct hexapod_move move;   // The movement command for rotary motion
     Quaternion orientation;     // the rotation for current orientation of the effector
     struct coord joint_actual;  // coordinates of effector joint under rotation (mm)
+    double last_seen_print_time;// Print time when rotation move was last seen from itersolve
+    double last_seen_move_timeA;// Move time when rotation move was last seen from itersolve
+    double last_seen_move_timeB;// Move time when rotation move was last seen from itersolve
 };
 
 /*********** Private helper functions ***********/
@@ -73,6 +76,7 @@ static void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quatern
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
 
     // Disable movement
+    ds->move.armed = false;
     ds->move.active = false;
     
     // Set the current rotation transformation for orienting the effector
@@ -84,10 +88,29 @@ static void _hexapod_stepper_set_rotation(struct stepper_kinematics *sk, Quatern
     Quaternion_rotate(&ds->orientation, ds->joint.axis, ds->joint_actual.axis);
 
     // Set movement state going forward
-    ds->move.active = enable;
+    ds->move.armed = enable;
 }
 
 /*********** Public functions for controlling the rotational movement ***********/
+
+// Get the last seen print time from the move struct
+double __visible hexapod_stepper_get_last_print_time(struct stepper_kinematics *sk)
+{
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+    return ds->last_seen_print_time;
+}
+// Get the last seen move time from the move struct
+double __visible hexapod_stepper_get_last_move_timeA(struct stepper_kinematics *sk)
+{
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+    return ds->last_seen_move_timeA;
+}
+// Get the last seen move time supplied as an argument
+double __visible hexapod_stepper_get_last_move_timeB(struct stepper_kinematics *sk)
+{
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+    return ds->last_seen_move_timeB;
+}
 
 // Get the current working coordinates from stepper_kinematics
 double __visible hexapod_stepper_get_orientation(struct stepper_kinematics *sk, uint8_t component)
@@ -113,6 +136,7 @@ void __visible hexapod_stepper_set_orientation(struct stepper_kinematics *sk, do
 void __visible hexapod_stepper_lock_rotation(struct stepper_kinematics *sk)
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+    ds->move.armed = false;
     ds->move.active = false;
 }
 
@@ -135,7 +159,7 @@ struct __visible hexapod_move *hexapod_stepper_get_rotation_move(struct stepper_
 bool __visible hexapod_stepper_is_rotation_move(struct stepper_kinematics *sk)
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
-    return ds->move.active;
+    return ds->move.armed;
 }
 
 // Setup the rotation movement and activate extra calculations
@@ -145,11 +169,12 @@ void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, 
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
 
     // Disable rotation re-calculation
+    ds->move.armed = false;
     ds->move.active = false;
 
     // Store the move vector, to help identify when to apply rotation
     for( int i = 0 ; i < 3 ; i++ ) {
-       ds->move.axes_r[i] = axes_r[i];
+       ds->move.axes_r.axis[i] = axes_r[i];
     }
 
     // Set the start and end coordinates
@@ -157,10 +182,10 @@ void __visible hexapod_stepper_set_rotation_move(struct stepper_kinematics *sk, 
     _hexapod_stepper_set_coordinate(end_pos, end_rot, &ds->move.end);
 
     // Calculate the linear distance between the start and end points
-    ds->move.distance = _hexapod_stepper_get_distance(&ds->move.start.position, &ds->move.end.position);
+    ds->move.distance_r = _hexapod_stepper_get_distance(&ds->move.start.position, &ds->move.end.position);
     
     // Enable rotation re-calculation
-    ds->move.active = true;
+    ds->move.armed = true;
 }
 
 // Complete the rotation movement by finalising the orientation and stopping extra calculations
@@ -175,52 +200,73 @@ void __visible hexapod_stepper_finish_rotation_move(struct stepper_kinematics *s
 
 /*********** The main kinematics functions for Klipper ***********/
 
+static double _hexapod_dot_product(struct coord a, struct coord b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z;
+}
+
+static bool _hexapod_are_unit_vectors_equal(struct coord a, struct coord b) {
+    const double epsilon = 1e-9;
+    double dot;
+
+    dot = _hexapod_dot_product(a, b);
+
+    return 1.0 - dot < epsilon && dot > 0.0 - epsilon;
+}
+
+bool _hexapod_get_move_fraction(struct stepper_kinematics *sk, struct move *m, struct coord effector_position) {
+    struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
+    double s, t;
+
+    // Calculate the "closeness" to the start and end positions:
+    // 0 = further away that the start position, 1 = located at the end position
+    // This is safe because if movement continues before rotation command is updated there
+    // will not be any sudden discontinuous motion.
+    s = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.start.position) * ds->move.distance_r;
+    t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end.position) * ds->move.distance_r;
+
+    if (t >= 0.0 && s >= 0.0) {
+        return t;
+    } else {
+        return NAN;
+    }
+}
+
 static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struct move *m, double move_time)
 {
     struct hexapod_stepper *ds = container_of(sk, struct hexapod_stepper, sk);
     struct coord effector_position = move_get_coord(m, move_time);
-    double s, t;
-    bool is_rotation_move_vector = true;
+    double t = NAN;
 
     // Execute an active rotation movement
-    if(ds->move.active) {
-        
-        //errorf("hexapod_stepper_calc_position: called with struct move->print_time=%f", &m->print_time);
+    if( ds->move.armed ) {
+        // Check if this move is on the correct heading
+        ds->move.active = _hexapod_are_unit_vectors_equal(m->axes_r, ds->move.axes_r);
+    }
 
-        // Calculate the "closeness" to the end position:
-        // 0 = further away that the start position, 1 = located at the end position
-        // This is safe because if movement continues before rotation command is updated there
-        // will not be any sudden discontinuous motion.
-        s = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.start.position) / ds->move.distance;
-        t = 1.0 - _hexapod_stepper_get_distance(&effector_position, &ds->move.end.position) / ds->move.distance;
+    if( ds->move.active ) {
+        // Check if this trapq move is between the start and end positions for the rotational move
+        t = _hexapod_get_move_fraction(sk, m, effector_position);
 
-        ///////////////////
+        // t is NaN if the current position is not between the start and end positions
+        if( isnan(t) ) {
+            ds->move.active = false;
+        } else {
+            // Rotate in proportion to how close the effector is to the end position
+            // Use spherical linear interpolation to get the correct rotation
+            Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
+            _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
 
-        // // Check if this move is in the same direction as the rotation move
-        for( int i = 0 ; i < 3 ; i++ ) {
-            if( fabs(m->axes_r.axis[i] - ds->move.axes_r[i]) > 1e-9 ) {
-                is_rotation_move_vector = false;
+            // If the current position is the end, flag the rotation move as inactive
+            // (leave the move flagged as "armed" because the steps calculation might be repeated)
+            if (fabs(1.0 - t) < 1e-9) {
+                // errorf("Reached the end of the rotation move.");
+                ds->move.active = false;
             }
-        }
 
-        ///////////////////
-
-        if (is_rotation_move_vector) {
-            if (t >= 0.0 && s >= 0.0) {
-
-                if (fabs(1.0 - t) < 1e-9) {
-                    // errorf("Reached the end of the rotation move.");
-                    _hexapod_stepper_set_rotation(sk, &ds->move.end.orientation, false);
-                } else {
-                //if (t >= 0.0) {
-                    // Rotate in proportion to how close the effector is to the end position
-                    // Use spherical linear interpolation to get the correct rotation
-                    Quaternion_slerp(&ds->move.start.orientation, &ds->move.end.orientation, t, &ds->orientation);
-
-                    // Rotate the effector
-                    _hexapod_stepper_set_rotation(sk, &ds->orientation, true);
-                }
-            }
+            // Log the print_time
+            ds->last_seen_print_time = m->print_time;
+            ds->last_seen_move_timeA = m->move_t;
+            ds->last_seen_move_timeB = move_time;
         }
     }
 
@@ -232,7 +278,6 @@ static double hexapod_stepper_calc_position(struct stepper_kinematics *sk, struc
     // Calculate the correct position for the printer rail at this point in the move
     return sqrt(ds->arm2 - dx*dx - dy*dy) + dz;
 }
-
 
 struct stepper_kinematics * __visible
 // hexapod_stepper_alloc(double arm2, struct coord *tower, struct coord *joint)
