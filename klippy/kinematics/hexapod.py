@@ -451,6 +451,28 @@ class HexapodRotationAxis:
                         # else:
                         #     logging.info("Stepper axis movement OFF.")
 
+                curtime = self.reactor.monotonic()
+                est_print_time = self.mcu.estimated_print_time(curtime)
+
+                logging.info("Rotation move check: %g is estimated immediate print_time." % (est_print_time))
+
+            if not move._hexapod_proceed_flag:
+
+                # Flush the lookahead queue so that the current rotation move instruction can be cleared.
+                move.toolhead.flush_step_generation()
+                logging.info("Flushed lookahead queue to make way for new rotation instruction.")
+
+                # Finalise all rotation move instructions
+                for rail in self.kinematics.rails:
+                    steppers = rail.get_steppers()
+                    for stepper in steppers:
+                        sk = stepper.get_stepper_kinematics()
+                        if ffi_lib.hexapod_stepper_is_rotation_move(sk):
+                            ffi_lib.hexapod_stepper_finish_rotation_move(sk)
+
+                # Flag that the new rotation move instruction can queued up
+                move._hexapod_proceed_flag = True
+
             if not move._hexapod_proceed_flag:
 
                 # Reset the angles
