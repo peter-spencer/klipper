@@ -451,8 +451,8 @@ class HexapodRotationAxis:
                         # else:
                         #     logging.info("Stepper axis movement OFF.")
 
-                curtime = self.reactor.monotonic()
-                est_print_time = self.mcu.estimated_print_time(curtime)
+                curtime = move.toolhead.reactor.monotonic()
+                est_print_time = move.toolhead.mcu.estimated_print_time(curtime)
 
                 logging.info("Rotation move check: %g is estimated immediate print_time." % (est_print_time))
 
