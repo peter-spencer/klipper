@@ -13,6 +13,8 @@
 import chelper, math, logging
 import stepper, mathutil
 
+from toolhead import Move as ToolheadMoveObject
+
 # delay import until configuration time
 np = None
 scipy = None
@@ -37,6 +39,10 @@ class HexapodKinematics:
         self.toolhead = toolhead
         self.config = config
         self.stepper_configs = [config.getsection('stepper_' + a) for a in 'abcdef']
+
+        # Parameters for the Forward Kinematics numerical solver
+        self.solver_max_iterations = config.getint('solver_max_iterations', 100, minval=1)
+        self.solver_convergence = config.getfloat('solver_max_iterations', 1e-5, minval=1e-12)
 
         # Setup the 3D printer geometry
         self._calculate_tower_rails()
@@ -263,10 +269,7 @@ class HexapodKinematics:
         return jacT.T
 
     # Calculate the cartesian coordinates for a given set of stepper positions
-    def _actuator_to_cartesian(self, spos, initial_guess=None):
-        max_iterations = 100
-        convergence = 1e-5
-        
+    def _actuator_to_cartesian(self, spos, initial_guess=None):        
         logging.info("Forward Kinematics starting, solving for stepper positions (%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) mm..."
                       % (spos[0],spos[1],spos[2],spos[3],spos[4],spos[5]))
 
@@ -276,7 +279,7 @@ class HexapodKinematics:
         else:
             current_guess = np.array(initial_guess)
 
-        for q in range(max_iterations):
+        for q in range(self.solver_max_iterations):
             logging.info("Iteration %d: Current guess = (%.3f,%.3f,%.3f) mm, (%.3f,%.3f,%.3f) deg" % (q,
                 current_guess[0],current_guess[1],current_guess[2],current_guess[3],current_guess[4],current_guess[5]))
 
@@ -288,12 +291,14 @@ class HexapodKinematics:
             delta = np.sum(np.abs((current_guess-new_guess)/(current_guess+new_guess)))
 
             # Test for successful convergence to stop the solver
-            if delta <= convergence:
-                logging.info("Convergence criterion achieved: %g < %g" % (delta, convergence))
+            if delta <= self.solver_convergence:
+                logging.info("Convergence criterion achieved: %g < %g" % (delta, self.solver_convergence))
                 break
             
             # Setup for next iteration
             current_guess = new_guess
+        else:
+            logging.info("Forward Kinematics did not converge, achieved %g > %g after %d iterations."%(delta, self.solver_convergence,self.solver_max_iterations))
 
         logging.info("Cartesian coordinates calculated to be (%.3f,%.3f,%.3f) mm, (%.3f,%.3f,%.3f) deg" % (
                 current_guess[0],current_guess[1],current_guess[2],current_guess[3],current_guess[4],current_guess[5]))
@@ -343,6 +348,12 @@ class HexapodKinematics:
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
 
+        test_move = HexapodMove(self, move)
+        x,y = self.towers[-1]
+        printer = self.config.get_printer()
+        gcode = printer.lookup_object('gcode')
+        gcode.respond_info("Move min distance = %g, max distance = %g, velocity = %g\n" % (test_move.get_XYtoMove_distance_min(x,y), test_move.get_XYtoMove_distance_max(x,y), test_move.get_XYtoMove_velocity_max(x,y)))
+
         if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
             # Normal XY move
             return
@@ -354,10 +365,12 @@ class HexapodKinematics:
         limit_xy2 = self.max_xy2
 
         if end_z > self.limit_z:
+            # Determine the reduced XY range that is allowed at this Z
             above_z_limit = end_z - self.limit_z
-            allowed_radius = self.radius - math.sqrt(
-                self.min_arm2 - (self.min_arm_length - above_z_limit)**2
-            )
+            if above_z_limit > self.min_arm_length:
+                allowed_radius = 0
+            else:
+                allowed_radius = self.radius - math.sqrt(self.min_arm2 - (self.min_arm_length - above_z_limit)**2)
             limit_xy2 = min(limit_xy2, allowed_radius**2)
 
         if end_xy2 > limit_xy2 or end_z > self.max_z or end_z < self.min_z:
@@ -368,13 +381,12 @@ class HexapodKinematics:
             limit_xy2 = -1.
 
         if move.axes_d[2]:
+            # Limit Z movement speed
             z_ratio = move.move_d / abs(move.axes_d[2])
-            move.limit_speed(self.max_z_velocity * z_ratio,
-                             self.max_z_accel * z_ratio)
+            move.limit_speed(self.max_z_velocity * z_ratio, self.max_z_accel * z_ratio)
             limit_xy2 = -1.
             
-        # Limit the speed/accel of this move if is is at the extreme
-        # end of the build envelope
+        # Limit the speed/accel of this move if is is at the extreme end of the build envelope
         extreme_xy2 = max(end_xy2, move.start_pos[0]**2 + move.start_pos[1]**2)
         if extreme_xy2 > self.slow_xy2:
             r = 0.5
@@ -400,6 +412,72 @@ class HexapodKinematics:
     #     return HexapodCalibration(self.radius, self.angles, self.arm_lengths,
     #                             self.endstops, stepdists)
 
+class HexapodMove:
+    def __init__(self, kin: HexapodKinematics, move_object: ToolheadMoveObject):
+        self.kinematics = kin
+        self.move_object = move_object
+
+    def A(self) -> float:
+        x_move = self.move_object.axes_d[0]
+        y_move = self.move_object.axes_d[1]
+        return x_move**2 + y_move**2
+
+    def B(self, X: float, Y: float) -> float:
+        x_move = self.move_object.axes_d[0]
+        y_move = self.move_object.axes_d[1]        
+        x_start = self.move_object.start_pos[0] - X
+        y_start = self.move_object.start_pos[1] - Y
+        return x_start*x_move + y_start*y_move
+
+    def C(self, X: float, Y: float) -> float:
+        x_start = self.move_object.start_pos[0] - X
+        y_start = self.move_object.start_pos[1] - Y
+        C = x_start**2 + y_start**2
+
+    def get_XYtoMove_squared_distance(self, X: float, Y: float, move_fraction: float) -> float:
+        return self.A()*move_fraction**2 + 2*self.B(X,Y)*move_fraction + self.C(X,Y)
+
+    def get_XYtoMove_distance(self, X: float, Y: float, move_fraction: float) -> float:
+        return math.sqrt(self.get_XYtoMove_squared_distance(X, Y, move_fraction))
+
+    def get_XYtoMove_velocity(self, X: float, Y: float, move_fraction: float) -> float:
+        return (self.A()*move_fraction + self.B(X,Y)) / self.get_XYtoMove_distance(X, Y, move_fraction)
+
+    def get_XYtoMove_distance_extreme(self, X: float, Y: float) -> float:
+        # Velocity drops to zero
+        return -self.B(X,Y) / self.A()
+
+    def get_XYtoMove_acceleration(self, X: float, Y: float, move_fraction: float) -> float:
+        return (self.A() - self.get_XYtoMove_velocity(X, Y, move_fraction)**2) / self.get_XYtoMove_distance(X, Y, move_fraction)
+
+    def get_XYtoMove_velocity_extreme(self, X: float, Y: float) -> float:
+        # Acceleration drops to zero
+        return self.B(X,Y) / self.A() - self.C(X,Y) / self.B(X,Y)
+
+    def get_XYtoMove_distance_min(self, X: float, Y: float) -> float:
+        extreme_point = self.get_XYtoMove_distance_extreme(X, Y)
+        if 0.0 < extreme_point < 1.0:
+            if self.get_XYtoMove_acceleration(X,Y,extreme_point) > 0.0:
+                return self.get_XYtoMove_distance(extreme_point)
+        return min(self.get_XYtoMove_distance(X,Y,0.0), self.get_XYtoMove_distance(X,Y,1.0))
+
+    def get_XYtoMove_distance_max(self, X: float, Y: float) -> float:
+        extreme_point = self.get_XYtoMove_distance_extreme(X, Y)
+        if 0.0 < extreme_point < 1.0:
+            if self.get_XYtoMove_acceleration(X,Y,extreme_point) < 0.0:
+                return self.get_XYtoMove_distance(extreme_point)
+        return max(self.get_XYtoMove_distance(X,Y,0.0), self.get_XYtoMove_distance(X,Y,1.0))
+
+    def get_XYtoMove_velocity_max(self, X: float, Y: float) -> float:
+        return_candidates = [self.get_XYtoMove_velocity(X,Y,0.0), self.get_XYtoMove_velocity(X,Y,1.0)]
+        extreme_point = self.get_XYtoMove_velocity_extreme(X, Y)
+        if 0.0 < extreme_point < 1.0:
+            return_candidates.append(self.get_XYtoMove_velocity(extreme_point))
+        return max(return_candidates)
+
+
+    
+
 class HexapodRotationAxis:
     def __init__(self, kinematics, gcode_id, initial_position=0.):
         self.kinematics = kinematics
@@ -409,9 +487,6 @@ class HexapodRotationAxis:
 
     def calc_junction(self, prev_move, move, axis_index):
         return move.max_cruise_v2
-
-    def find_past_position(self, print_time):
-        return 0.
 
     # Called after (X,Y,Z) move has already been added to the trapezoidal queue (too late to reliably influence iterative solver).
     def process_move(self, next_move_time, move, axis_index):
@@ -445,11 +520,7 @@ class HexapodRotationAxis:
                             logging.info("%s: Logged last print time from move struct = %g" % (stepper.get_name(), ffi_lib.hexapod_stepper_get_last_print_time(sk)))
                             logging.info("%s: Logged last move time from move struct = %g" % (stepper.get_name(), ffi_lib.hexapod_stepper_get_last_move_timeA(sk)))
                             logging.info("%s: Logged last move time for calculation = %g" % (stepper.get_name(), ffi_lib.hexapod_stepper_get_last_move_timeB(sk)))
-
                             move._hexapod_proceed_flag = False
-                        #     logging.info("Stepper axis movement ON, this extra rotation move will be rejected.")
-                        # else:
-                        #     logging.info("Stepper axis movement OFF.")
 
                 curtime = move.toolhead.reactor.monotonic()
                 est_print_time = move.toolhead.mcu.estimated_print_time(curtime)
@@ -501,7 +572,7 @@ class HexapodRotationAxis:
                                                         list(end_pos), list(end_rot.as_quat(scalar_first=True)), list(move.axes_r))
 
     def get_trapq(self):
-        return None
+        return self.kinematics.toolhead.get_trapq()
 
     def get_name(self):
         return "rotation_" + self.get_axis_gcode_id().casefold()
