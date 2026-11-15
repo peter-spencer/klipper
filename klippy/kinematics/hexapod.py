@@ -356,7 +356,7 @@ class HexapodKinematics:
                 gcode = printer.lookup_object('gcode')
                 gcode.respond_info("Move min distance = %g, max distance = %g, velocity = %g\n" % (test_move.get_XYtoMove_distance_min(x,y), test_move.get_XYtoMove_distance_max(x,y), test_move.get_XYtoMove_velocity_max(x,y)))
             except:
-                logging.info("New code failed")
+                gcode.respond_info("New code failed")
 
         if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
             # Normal XY move
