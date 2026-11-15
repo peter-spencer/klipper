@@ -353,13 +353,13 @@ class HexapodKinematics:
             gcode = printer.lookup_object('gcode')
             test_move = HexapodMove(self, move)
             test_move.sign_ABC = -1.0
-            test_move.arm_length = self.arm_lengths[-1]
-            x,y = self.towers[-1]
-            # gcode.respond_info("Tower coordinates (%g,%g)\n" % (x,y))
-            gcode.respond_info("Move min distance = %4g mm, max distance = %4g mm, max velocity = %4g mm/s\n" % (
-                test_move.get_XYtoMove_distance_min(x,y),
-                test_move.get_XYtoMove_distance_max(x,y),
-                test_move.get_XYtoMove_velocity_max(x,y) / move.min_move_t))
+            for arm_length, tower, joint in zip(self.arm_lengths,self.towers,self.joints):
+                test_move.arm_length = arm_length
+                x, y = tower[0]-joint[0], tower[1]-joint[1]
+                gcode.respond_info("Move min distance = %4g mm, max distance = %4g mm, max velocity = %4g mm/s\n" % (
+                    test_move.get_XYtoMove_distance_min(x,y),
+                    test_move.get_XYtoMove_distance_max(x,y),
+                    test_move.get_XYtoMove_velocity_max(x,y) / move.min_move_t))
 
         if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
             # Normal XY move
