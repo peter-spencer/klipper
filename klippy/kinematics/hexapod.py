@@ -348,11 +348,12 @@ class HexapodKinematics:
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
 
-        test_move = HexapodMove(self, move)
-        x,y = self.towers[-1]
-        printer = self.config.get_printer()
-        gcode = printer.lookup_object('gcode')
-        gcode.respond_info("Move min distance = %g, max distance = %g, velocity = %g\n" % (test_move.get_XYtoMove_distance_min(x,y), test_move.get_XYtoMove_distance_max(x,y), test_move.get_XYtoMove_velocity_max(x,y)))
+        if move.axes_d[0] or move.axes_d[1]:
+            test_move = HexapodMove(self, move)
+            x,y = self.towers[-1]
+            printer = self.config.get_printer()
+            gcode = printer.lookup_object('gcode')
+            gcode.respond_info("Move min distance = %g, max distance = %g, velocity = %g\n" % (test_move.get_XYtoMove_distance_min(x,y), test_move.get_XYtoMove_distance_max(x,y), test_move.get_XYtoMove_velocity_max(x,y)))
 
         if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
             # Normal XY move
