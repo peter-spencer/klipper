@@ -129,9 +129,21 @@ class HexapodKinematics:
         self.abs_endstops = [self._cartesian_to_actuator((0., 0., endstop, 0., 0., 0.), arm2, tower, joint)
                                 for endstop, arm2, tower, joint in zip(self.endstops, self.arm2, self.towers, self.joints)]
 
-        logging.info(
-                    "Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
-                    % (self.abs_endstops[0],self.abs_endstops[1],self.abs_endstops[2],self.abs_endstops[3],self.abs_endstops[4],self.abs_endstops[5]))
+        # Minimum position the steppers can go down to
+        default_position_range = self.stepper_configs[0].getfloat('position_range')
+        default_max_velocity = self.stepper_configs[0].getfloat('max_rail_velocity', self.max_velocity)
+        default_max_accel = self.stepper_configs[0].getfloat('max_rail_accel', self.max_accel)
+        self.position_min = []
+        self.max_rail_velocity = []
+        self.max_rail_accel = []
+        for sconfig, abs_endstop in zip(self.stepper_configs, self.abs_endstops):
+            self.max_rail_velocity.append(sconfig.getfloat('max_rail_velocity', default_max_velocity))
+            self.max_rail_accel.append(sconfig.getfloat('max_rail_accel', default_max_accel))
+            self.position_min.append(abs_endstop - sconfig.getfloat('position_range', default_position_range))
+
+        logging.info("Absolute endstop positions: %.2f, %.2f, %.2f, %.2f, %.2f, %.2f mm"
+                        % (self.abs_endstops[0],self.abs_endstops[1],self.abs_endstops[2],
+                        self.abs_endstops[3],self.abs_endstops[4],self.abs_endstops[5]))
 
     def _calculate_tower_rails(self):
         # Load the first rail, stepper_a
@@ -347,38 +359,42 @@ class HexapodKinematics:
     def check_move(self, move: ToolheadMoveObject):
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
+        hex_move = HexapodMove(self, move)
 
-        if not self.need_home and (move.axes_d[0] or move.axes_d[1]):
-            printer = self.config.get_printer()
-            gcode = printer.lookup_object('gcode')
-            test_move = HexapodMove(self, move)
-            test_move.sign_ABC = -1.0
-            for arm_length, tower, joint in zip(self.arm_lengths,self.towers,self.joints):
-                test_move.arm_length = arm_length
-                x, y = tower[0]-joint[0], tower[1]-joint[1]
-                gcode.respond_info("Move min distance = %4g mm, max distance = %4g mm, max velocity = %4g mm/s\n" % (
-                    test_move.get_XYtoMove_distance_min(x,y),
-                    test_move.get_XYtoMove_distance_max(x,y),
-                    test_move.get_XYtoMove_velocity_max(x,y) / move.min_move_t))
+        # if not self.need_home and (move.axes_d[0] or move.axes_d[1]):
+        #     printer = self.config.get_printer()
+        #     gcode = printer.lookup_object('gcode')
+        #     test_move = HexapodMove(self, move)
+        #     test_move.sign_ABC = -1.0
+        #     for arm_length, tower, joint in zip(self.arm_lengths,self.towers,self.joints):
+        #         test_move.arm_length = arm_length
+        #         x, y = tower[0]-joint[0], tower[1]-joint[1]
+        #         gcode.respond_info("Move min distance = %4g mm, max distance = %4g mm, max velocity = %4g mm/s" % (
+        #             test_move.get_XYtoMove_distance_min(x,y),
+        #             test_move.get_XYtoMove_distance_max(x,y),
+        #             test_move.get_XYtoMove_velocity_max(x,y) / move.min_move_t))
 
-        if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
-            # Normal XY move
-            return
+        # if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
+        #     # Normal XY move
+        #     return
         
         if self.need_home:
             raise move.move_error("Must home first")
+
+        if move.axes_d[0] or move.axes_d[1]:
+            hex_move.check_linear_move()
         
         end_z = end_pos[2]
         limit_xy2 = self.max_xy2
 
-        if end_z > self.limit_z:
-            # Determine the reduced XY range that is allowed at this Z
-            above_z_limit = end_z - self.limit_z
-            if above_z_limit > self.min_arm_length:
-                allowed_radius = 0
-            else:
-                allowed_radius = self.radius - math.sqrt(self.min_arm2 - (self.min_arm_length - above_z_limit)**2)
-            limit_xy2 = min(limit_xy2, allowed_radius**2)
+        # if end_z > self.limit_z:
+        #     # Determine the reduced XY range that is allowed at this Z
+        #     above_z_limit = end_z - self.limit_z
+        #     if above_z_limit > self.min_arm_length:
+        #         allowed_radius = 0
+        #     else:
+        #         allowed_radius = self.radius - math.sqrt(self.min_arm2 - (self.min_arm_length - above_z_limit)**2)
+        #     limit_xy2 = min(limit_xy2, allowed_radius**2)
 
         if end_xy2 > limit_xy2 or end_z > self.max_z or end_z < self.min_z:
             # Move out of range - verify not a homing move
@@ -393,15 +409,15 @@ class HexapodKinematics:
             move.limit_speed(self.max_z_velocity * z_ratio, self.max_z_accel * z_ratio)
             limit_xy2 = -1.
             
-        # Limit the speed/accel of this move if is is at the extreme end of the build envelope
-        extreme_xy2 = max(end_xy2, move.start_pos[0]**2 + move.start_pos[1]**2)
-        if extreme_xy2 > self.slow_xy2:
-            r = 0.5
-            if extreme_xy2 > self.very_slow_xy2:
-                r = 0.25
-            move.limit_speed(self.max_velocity * r, self.max_accel * r)
-            limit_xy2 = -1.
-        self.limit_xy2 = min(limit_xy2, self.slow_xy2)
+        # # Limit the speed/accel of this move if is is at the extreme end of the build envelope
+        # extreme_xy2 = max(end_xy2, move.start_pos[0]**2 + move.start_pos[1]**2)
+        # if extreme_xy2 > self.slow_xy2:
+        #     r = 0.5
+        #     if extreme_xy2 > self.very_slow_xy2:
+        #         r = 0.25
+        #     move.limit_speed(self.max_velocity * r, self.max_accel * r)
+        #     limit_xy2 = -1.
+        # self.limit_xy2 = min(limit_xy2, self.slow_xy2)
 
 
     # Return status information
@@ -425,6 +441,42 @@ class HexapodMove:
         self.move_object = move_object
         self.arm_length = 0.0
         self.sign_ABC = 1.0
+
+    def check_linear_move(self):
+        for rail, arm_length, tower, joint, abs_endstop, position_min, max_velocity, max_accel \
+                        in zip(self.kinematics.rails,self.kinematics.arm_lengths,self.kinematics.towers,
+                               self.kinematics.joints,self.kinematics.abs_endstops,self.kinematics.position_min,
+                               self.kinematics.max_rail_velocity,self.kinematics.max_rail_accel):
+            self.arm_length = arm_length
+            x, y = tower[0]-joint[0], tower[1]-joint[1]
+
+            # Check that none of the joints are required to be more than an arm's length away
+            self.sign_ABC = 1.0
+            if self.get_XYtoMove_distance_max(x,y) > arm_length:
+                raise self.move_object.move_error("Move out of range (%s arm too short)." % (rail.get_name()))
+
+            # Switch to rail vertical position and find lowest,highest points
+            self.sign_ABC = -1.0
+            z_move_min, z_move_max = [self.move_object.start_pos[2], self.move_object.end_pos[2]].sort()
+
+            # Check that this rail doesn't hit it's minimum position
+            z_min = self.get_XYtoMove_distance_min(x,y) + z_move_min
+            if z_min < position_min:
+                raise self.move_object.move_error("Move out of range (%s below minimum position)." % (rail.get_name()))
+            
+            # Check that this rail doesn't hit it's maximum position
+            z_max = self.get_XYtoMove_distance_max(x,y) + z_move_max
+            if z_max > abs_endstop:
+                raise self.move_object.move_error("Move out of range (%s above minimum position)." % (rail.get_name()))
+            
+            # Now check the maximum velocity of the stepper (the carriage that pushes the arm)
+            z_speed = (z_move_max - z_move_min) / self.move_object.min_move_t
+            total_v = z_speed + self.get_XYtoMove_velocity_max(x,y)
+            if total_v > max_velocity:
+                reduction_factor = max_velocity / total_v
+                self.move_object.limit_speed(reduction_factor*math.sqrt(self.move_object.max_cruise_v2),
+                                             reduction_factor*self.move_object.accel)
+            
 
     def A(self) -> float:
         x_move = self.move_object.axes_d[0]
