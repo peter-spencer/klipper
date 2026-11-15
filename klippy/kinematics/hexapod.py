@@ -357,8 +357,8 @@ class HexapodKinematics:
 
     # Check that a proposed move will be possible
     def check_move(self, move: ToolheadMoveObject):
-        end_pos = move.end_pos
-        end_xy2 = end_pos[0]**2 + end_pos[1]**2
+        # end_pos = move.end_pos
+        # end_xy2 = end_pos[0]**2 + end_pos[1]**2
         hex_move = HexapodMove(self, move)
 
         # if not self.need_home and (move.axes_d[0] or move.axes_d[1]):
@@ -385,8 +385,8 @@ class HexapodKinematics:
         if move.axes_d[0] or move.axes_d[1]:
             hex_move.check_linear_move()
         
-        end_z = end_pos[2]
-        limit_xy2 = self.max_xy2
+        # end_z = end_pos[2]
+        # limit_xy2 = self.max_xy2
 
         # if end_z > self.limit_z:
         #     # Determine the reduced XY range that is allowed at this Z
@@ -397,18 +397,18 @@ class HexapodKinematics:
         #         allowed_radius = self.radius - math.sqrt(self.min_arm2 - (self.min_arm_length - above_z_limit)**2)
         #     limit_xy2 = min(limit_xy2, allowed_radius**2)
 
-        if end_xy2 > limit_xy2 or end_z > self.max_z or end_z < self.min_z:
-            # Move out of range - verify not a homing move
-            if (end_pos[:2] != self.home_position[:2]
-                or end_z < self.min_z or end_z > self.home_position[2]):
-                raise move.move_error()
-            limit_xy2 = -1.
+        # if end_xy2 > limit_xy2 or end_z > self.max_z or end_z < self.min_z:
+        #     # Move out of range - verify not a homing move
+        #     if (end_pos[:2] != self.home_position[:2]
+        #         or end_z < self.min_z or end_z > self.home_position[2]):
+        #         raise move.move_error()
+        #     limit_xy2 = -1.
 
         if move.axes_d[2]:
             # Limit Z movement speed
             z_ratio = move.move_d / abs(move.axes_d[2])
             move.limit_speed(self.max_z_velocity * z_ratio, self.max_z_accel * z_ratio)
-            limit_xy2 = -1.
+            # limit_xy2 = -1.
             
         # # Limit the speed/accel of this move if is is at the extreme end of the build envelope
         # extreme_xy2 = max(end_xy2, move.start_pos[0]**2 + move.start_pos[1]**2)
@@ -473,7 +473,7 @@ class HexapodMove:
             # Check that this rail doesn't hit it's maximum position
             z_max = self.get_XYtoMove_distance_max(x,y) + z_move_max
             if z_max > abs_endstop:
-                raise self.move_object.move_error("Move out of range (%s above minimum position)." % (rail.get_name()))
+                raise self.move_object.move_error("Move out of range (%s above maximum position)." % (rail.get_name()))
             
             # Now check the maximum velocity of the stepper (the carriage that pushes the arm)
             z_speed = (z_move_max - z_move_min) / self.move_object.min_move_t
