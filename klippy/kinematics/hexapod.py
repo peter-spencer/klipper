@@ -352,9 +352,11 @@ class HexapodKinematics:
             printer = self.config.get_printer()
             gcode = printer.lookup_object('gcode')
             test_move = HexapodMove(self, move)
+            test_move.sign_ABC = -1.0
+            test_move.arm_length = self.arm_lengths[-1]
             x,y = self.towers[-1]
             gcode.respond_info("Tower coordinates (%g,%g)\n" % (x,y))
-            gcode.respond_info("Move min distance = %g, max distance = %g, velocity = %g\n" % (test_move.get_XYtoMove_distance_min(x,y), test_move.get_XYtoMove_distance_max(x,y), test_move.get_XYtoMove_velocity_max(x,y)))
+            gcode.respond_info("Move min distance = %g, max distance = %g, max velocity = %g\n" % (test_move.get_XYtoMove_distance_min(x,y), test_move.get_XYtoMove_distance_max(x,y), test_move.get_XYtoMove_velocity_max(x,y)))
 
         if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
             # Normal XY move
@@ -418,23 +420,25 @@ class HexapodMove:
     def __init__(self, kin: HexapodKinematics, move_object: ToolheadMoveObject):
         self.kinematics = kin
         self.move_object = move_object
+        self.arm_length = 0.0
+        self.sign_ABC = 1.0
 
     def A(self) -> float:
         x_move = self.move_object.axes_d[0]
         y_move = self.move_object.axes_d[1]
-        return x_move**2 + y_move**2
+        return self.sign_ABC * (x_move**2 + y_move**2)
 
     def B(self, X: float, Y: float) -> float:
         x_move = self.move_object.axes_d[0]
         y_move = self.move_object.axes_d[1]        
         x_start = self.move_object.start_pos[0] - X
         y_start = self.move_object.start_pos[1] - Y
-        return x_start*x_move + y_start*y_move
+        return self.sign_ABC * (x_start*x_move + y_start*y_move)
 
     def C(self, X: float, Y: float) -> float:
         x_start = self.move_object.start_pos[0] - X
         y_start = self.move_object.start_pos[1] - Y
-        return x_start**2 + y_start**2
+        return self.arm_length**2 + self.sign_ABC * (x_start**2 + y_start**2) 
 
     def get_XYtoMove_squared_distance(self, X: float, Y: float, move_fraction: float) -> float:
         return self.A()*move_fraction**2 + 2*self.B(X,Y)*move_fraction + self.C(X,Y)
