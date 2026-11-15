@@ -344,7 +344,7 @@ class HexapodKinematics:
 
 
     # Check that a proposed move will be possible
-    def check_move(self, move):
+    def check_move(self, move: ToolheadMoveObject):
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
 
@@ -355,8 +355,11 @@ class HexapodKinematics:
             test_move.sign_ABC = -1.0
             test_move.arm_length = self.arm_lengths[-1]
             x,y = self.towers[-1]
-            gcode.respond_info("Tower coordinates (%g,%g)\n" % (x,y))
-            gcode.respond_info("Move min distance = %g, max distance = %g, max velocity = %g\n" % (test_move.get_XYtoMove_distance_min(x,y), test_move.get_XYtoMove_distance_max(x,y), test_move.get_XYtoMove_velocity_max(x,y)))
+            # gcode.respond_info("Tower coordinates (%g,%g)\n" % (x,y))
+            gcode.respond_info("Move min distance = %4g mm, max distance = %4g mm, max velocity = %4g mm/s\n" % (
+                test_move.get_XYtoMove_distance_min(x,y),
+                test_move.get_XYtoMove_distance_max(x,y),
+                test_move.get_XYtoMove_velocity_max(x,y) / move.min_move_t))
 
         if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
             # Normal XY move
