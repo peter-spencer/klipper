@@ -426,6 +426,7 @@ class HexapodMove:
             # Now check the maximum velocity of the stepper (the carriage that pushes the arm)
             z_speed = (z_move_max - z_move_min) / self.move_object.min_move_t
             total_v = z_speed + self.get_XYtoMove_velocity_max(x,y)
+            logging.info("check_move(): Maximum velocity reported as %g mm/s."%(total_v))
             if total_v > max_velocity:
                 reduction_factor = max_velocity / total_v
                 self.move_object.limit_speed(reduction_factor*math.sqrt(self.move_object.max_cruise_v2),
