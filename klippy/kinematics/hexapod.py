@@ -381,7 +381,8 @@ class HexapodKinematics:
         if self.need_home:
             raise move.move_error("Must home first")
 
-        if end_pos[:2] != self.home_position[:2] and (move.axes_d[0] or move.axes_d[1]):
+        # if end_pos[:2] != self.home_position[:2] and (move.axes_d[0] or move.axes_d[1]):
+        if move.axes_d[0] or move.axes_d[1]:
             hex_move.check_linear_move()
         
         end_z = end_pos[2]
@@ -447,16 +448,18 @@ class HexapodMove:
                         in zip(self.kinematics.rails,self.kinematics.arm_lengths,self.kinematics.towers,
                                self.kinematics.joints,self.kinematics.abs_endstops,self.kinematics.position_min,
                                self.kinematics.max_rail_velocity,self.kinematics.max_rail_accel):
-            self.arm_length = arm_length
+            # Joint <--> Tower displacment in (X,Y) plane
             x, y = tower[0]-joint[0], tower[1]-joint[1]
 
             # Check that none of the joints are required to be more than an arm's length away
             self.sign_ABC = 1.0
-            if self.get_XYtoMove_distance_max(x,y) > arm_length:
-                raise self.move_object.move_error("Move out of range (%s arm too short, wanted to move %g for (%g,%g))." % (rail.get_name(),self.get_XYtoMove_distance_max(x,y),x,y))
+            self.arm_length = 0.0
+            if self.get_XYtoMove_distance_max(x,y) > self.arm_length:
+                raise self.move_object.move_error("Move out of range (%s arm too short)." % (rail.get_name()))
 
             # Switch to rail vertical position and find lowest,highest points
             self.sign_ABC = -1.0
+            self.arm_length = arm_length
             z_move_min, z_move_max = [self.move_object.start_pos[2], self.move_object.end_pos[2]].sort()
 
             # Check that this rail doesn't hit it's minimum position
