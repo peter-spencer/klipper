@@ -460,7 +460,10 @@ class HexapodMove:
             # Switch to rail vertical position and find lowest,highest points
             self.sign_ABC = -1.0
             self.arm_length = arm_length
-            z_move_min, z_move_max = list([self.move_object.start_pos[2], self.move_object.end_pos[2]].sort())
+            if self.move_object.start_pos[2] > self.move_object.end_pos[2]:
+                z_move_min, z_move_max =  self.move_object.end_pos[2], self.move_object.start_pos[2]
+            else:
+                z_move_min, z_move_max =  self.move_object.start_pos[2], self.move_object.end_pos[2]
 
             # Check that this rail doesn't hit it's minimum position
             z_min = self.get_XYtoMove_distance_min(x,y) + z_move_min
