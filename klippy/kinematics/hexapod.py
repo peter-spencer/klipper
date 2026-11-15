@@ -474,7 +474,7 @@ class HexapodMove:
         return_candidates = [self.get_XYtoMove_velocity(X,Y,0.0), self.get_XYtoMove_velocity(X,Y,1.0)]
         extreme_point = self.get_XYtoMove_velocity_extreme(X, Y)
         if 0.0 < extreme_point < 1.0:
-            return_candidates.append(self.get_XYtoMove_velocity(extreme_point))
+            return_candidates.append(self.get_XYtoMove_velocity(X,Y,extreme_point))
         return max(return_candidates)
 
 
