@@ -453,7 +453,7 @@ class HexapodMove:
             # Check that none of the joints are required to be more than an arm's length away
             self.sign_ABC = 1.0
             if self.get_XYtoMove_distance_max(x,y) > arm_length:
-                raise self.move_object.move_error("Move out of range (%s arm too short)." % (rail.get_name()))
+                raise self.move_object.move_error("Move out of range (%s arm too short, wanted to move %g)." % (rail.get_name(),self.get_XYtoMove_distance_max(x,y)))
 
             # Switch to rail vertical position and find lowest,highest points
             self.sign_ABC = -1.0
