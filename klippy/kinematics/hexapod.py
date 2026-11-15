@@ -381,7 +381,7 @@ class HexapodKinematics:
         if self.need_home:
             raise move.move_error("Must home first")
 
-        if move.axes_d[0] or move.axes_d[1]:
+        if end_pos[:2] != self.home_position[:2] and (move.axes_d[0] or move.axes_d[1]):
             hex_move.check_linear_move()
         
         end_z = end_pos[2]
