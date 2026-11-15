@@ -348,7 +348,7 @@ class HexapodKinematics:
         end_pos = move.end_pos
         end_xy2 = end_pos[0]**2 + end_pos[1]**2
 
-        if move.axes_d[0] or move.axes_d[1]:
+        if not self.need_home and (move.axes_d[0] or move.axes_d[1]):
             printer = self.config.get_printer()
             gcode = printer.lookup_object('gcode')
             test_move = HexapodMove(self, move)
@@ -434,7 +434,7 @@ class HexapodMove:
     def C(self, X: float, Y: float) -> float:
         x_start = self.move_object.start_pos[0] - X
         y_start = self.move_object.start_pos[1] - Y
-        C = x_start**2 + y_start**2
+        return x_start**2 + y_start**2
 
     def get_XYtoMove_squared_distance(self, X: float, Y: float, move_fraction: float) -> float:
         return self.A()*move_fraction**2 + 2*self.B(X,Y)*move_fraction + self.C(X,Y)
