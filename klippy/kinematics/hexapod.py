@@ -413,11 +413,17 @@ class HexapodMove:
             else:
                 z_move_min, z_move_max =  self.move_object.start_pos[2], self.move_object.end_pos[2]
 
-            # Check that this rail doesn't hit it's minimum position
-            z_min = self.get_XYtoMove_distance_min(x,y) + z_move_min
-            if z_min < position_min:
+            # Check that this rail doesn't end up below the joint height
+            z_min = self.get_XYtoMove_distance_min(x,y)
+            logging.info("Minimum position reported as %g" % (z_min))
+            if z_min <= 0.0:
                 raise self.move_object.move_error("Move out of range (%s below minimum position)." % (rail.get_name()))
             
+            # Check that this rail doesn't hit it's minimum position
+            z_min += z_move_min
+            if z_min < position_min:
+                raise self.move_object.move_error("Move out of range (%s below minimum position)." % (rail.get_name()))
+                        
             # Check that this rail doesn't hit it's maximum position
             z_max = self.get_XYtoMove_distance_max(x,y) + z_move_max
             if z_max > abs_endstop:
@@ -426,7 +432,6 @@ class HexapodMove:
             # Now check the maximum velocity of the stepper (the carriage that pushes the arm)
             z_speed = (z_move_max - z_move_min) / self.move_object.min_move_t
             total_v = z_speed + self.get_XYtoMove_velocity_max(x,y) / self.move_object.min_move_t
-            logging.info("check_move(): Maximum velocity reported as %g mm/s."%(total_v))
             if total_v > max_velocity:
                 reduction_factor = max_velocity / total_v
                 self.move_object.limit_speed(reduction_factor*math.sqrt(self.move_object.max_cruise_v2),
