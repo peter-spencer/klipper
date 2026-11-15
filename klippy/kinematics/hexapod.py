@@ -354,72 +354,20 @@ class HexapodKinematics:
         # Klipper natively supports only (X,Y,Z) coordinates
         homing_state.home_rails(self.rails, forcepos, self.home_position[:3])
 
-
     # Check that a proposed move will be possible
     def check_move(self, move: ToolheadMoveObject):
-        # end_pos = move.end_pos
-        # end_xy2 = end_pos[0]**2 + end_pos[1]**2
         hex_move = HexapodMove(self, move)
-
-        # if not self.need_home and (move.axes_d[0] or move.axes_d[1]):
-        #     printer = self.config.get_printer()
-        #     gcode = printer.lookup_object('gcode')
-        #     test_move = HexapodMove(self, move)
-        #     test_move.sign_ABC = -1.0
-        #     for arm_length, tower, joint in zip(self.arm_lengths,self.towers,self.joints):
-        #         test_move.arm_length = arm_length
-        #         x, y = tower[0]-joint[0], tower[1]-joint[1]
-        #         gcode.respond_info("Move min distance = %4g mm, max distance = %4g mm, max velocity = %4g mm/s" % (
-        #             test_move.get_XYtoMove_distance_min(x,y),
-        #             test_move.get_XYtoMove_distance_max(x,y),
-        #             test_move.get_XYtoMove_velocity_max(x,y) / move.min_move_t))
-
-        # if end_xy2 <= self.limit_xy2 and not move.axes_d[2]:
-        #     # Normal XY move
-        #     return
         
         if self.need_home:
             raise move.move_error("Must home first")
 
-        # if end_pos[:2] != self.home_position[:2] and (move.axes_d[0] or move.axes_d[1]):
-        if move.axes_d[0] or move.axes_d[1]:
+        if move.end_pos[:2] != self.home_position[:2] and (move.axes_d[0] or move.axes_d[1]):
             hex_move.check_linear_move()
         
-        # end_z = end_pos[2]
-        # limit_xy2 = self.max_xy2
-
-        # if end_z > self.limit_z:
-        #     # Determine the reduced XY range that is allowed at this Z
-        #     above_z_limit = end_z - self.limit_z
-        #     if above_z_limit > self.min_arm_length:
-        #         allowed_radius = 0
-        #     else:
-        #         allowed_radius = self.radius - math.sqrt(self.min_arm2 - (self.min_arm_length - above_z_limit)**2)
-        #     limit_xy2 = min(limit_xy2, allowed_radius**2)
-
-        # if end_xy2 > limit_xy2 or end_z > self.max_z or end_z < self.min_z:
-        #     # Move out of range - verify not a homing move
-        #     if (end_pos[:2] != self.home_position[:2]
-        #         or end_z < self.min_z or end_z > self.home_position[2]):
-        #         raise move.move_error()
-        #     limit_xy2 = -1.
-
         if move.axes_d[2]:
             # Limit Z movement speed
             z_ratio = move.move_d / abs(move.axes_d[2])
             move.limit_speed(self.max_z_velocity * z_ratio, self.max_z_accel * z_ratio)
-            # limit_xy2 = -1.
-            
-        # # Limit the speed/accel of this move if is is at the extreme end of the build envelope
-        # extreme_xy2 = max(end_xy2, move.start_pos[0]**2 + move.start_pos[1]**2)
-        # if extreme_xy2 > self.slow_xy2:
-        #     r = 0.5
-        #     if extreme_xy2 > self.very_slow_xy2:
-        #         r = 0.25
-        #     move.limit_speed(self.max_velocity * r, self.max_accel * r)
-        #     limit_xy2 = -1.
-        # self.limit_xy2 = min(limit_xy2, self.slow_xy2)
-
 
     # Return status information
     def get_status(self, eventtime):
