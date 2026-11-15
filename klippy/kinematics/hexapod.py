@@ -467,14 +467,14 @@ class HexapodMove:
         extreme_point = self.get_XYtoMove_distance_extreme(X, Y)
         if 0.0 < extreme_point < 1.0:
             if self.get_XYtoMove_acceleration(X,Y,extreme_point) > 0.0:
-                return self.get_XYtoMove_distance(extreme_point)
+                return self.get_XYtoMove_distance(X,Y,extreme_point)
         return min(self.get_XYtoMove_distance(X,Y,0.0), self.get_XYtoMove_distance(X,Y,1.0))
 
     def get_XYtoMove_distance_max(self, X: float, Y: float) -> float:
         extreme_point = self.get_XYtoMove_distance_extreme(X, Y)
         if 0.0 < extreme_point < 1.0:
             if self.get_XYtoMove_acceleration(X,Y,extreme_point) < 0.0:
-                return self.get_XYtoMove_distance(extreme_point)
+                return self.get_XYtoMove_distance(X,Y,extreme_point)
         return max(self.get_XYtoMove_distance(X,Y,0.0), self.get_XYtoMove_distance(X,Y,1.0))
 
     def get_XYtoMove_velocity_max(self, X: float, Y: float, preserve_sign = False) -> float:
