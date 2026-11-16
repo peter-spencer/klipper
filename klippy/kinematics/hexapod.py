@@ -397,6 +397,7 @@ class HexapodMove:
                                self.kinematics.joints,self.kinematics.abs_endstops,self.kinematics.position_min,
                                self.kinematics.max_rail_velocity,self.kinematics.max_rail_accel):
 
+            # Rotate the joint coordinates into their current position
             a,b,c = self.move_object.toolhead.get_position()[4:]
             r = scipy.spatial.transform.Rotation.from_euler('zyx', [c,b,a], degrees=True)
             joint = r.apply(raw_joint)
@@ -407,7 +408,6 @@ class HexapodMove:
             # Check that none of the joints are required to be more than an arm's length away
             self.sign_ABC = 1.0
             self.arm_length = 0.0
-            logging.info("Joint to arm distance reported as %g mm" % (self.get_XYtoMove_distance_max(x,y)))
             if self.get_XYtoMove_distance_max(x,y) > arm_length:
                 raise self.move_object.move_error("Move out of range (%s arm too short)." % (rail.get_name()))
 
@@ -418,17 +418,11 @@ class HexapodMove:
                 z_move_min, z_move_max =  self.move_object.end_pos[2], self.move_object.start_pos[2]
             else:
                 z_move_min, z_move_max =  self.move_object.start_pos[2], self.move_object.end_pos[2]
-
-            z_speed = (z_move_max - z_move_min) / self.move_object.min_move_t
-            total_v = z_speed + self.get_XYtoMove_velocity_max(x,y) / self.move_object.min_move_t
             
             # Check that this rail doesn't end up below the joint height
             z_min = self.get_XYtoMove_distance_min(x,y) + joint[2]
-            logging.info("Minimum position reported as %g mm" % (z_min))
-            logging.info("Maximum position reported as %g mm" % (self.get_XYtoMove_distance_max(x,y)))
-            logging.info("Maximum velocity reported as %g mm/s" % (total_v))
             if z_min <= 0.0:
-                raise self.move_object.move_error("Move out of range (%s below minimum position)." % (rail.get_name()))
+                raise self.move_object.move_error("Move out of range (%s below effector joint)." % (rail.get_name()))
             
             # Check that this rail doesn't hit it's minimum position
             z_min += z_move_min
@@ -436,11 +430,13 @@ class HexapodMove:
                 raise self.move_object.move_error("Move out of range (%s below minimum position)." % (rail.get_name()))
                         
             # Check that this rail doesn't hit it's maximum position
-            z_max = self.get_XYtoMove_distance_max(x,y) + z_move_max
+            z_max = self.get_XYtoMove_distance_max(x,y) + z_move_max + joint[2]
             if z_max > abs_endstop:
                 raise self.move_object.move_error("Move out of range (%s above maximum position)." % (rail.get_name()))
             
             # Now check the maximum velocity of the stepper (the carriage that pushes the arm)
+            z_speed = (z_move_max - z_move_min) / self.move_object.min_move_t
+            total_v = z_speed + self.get_XYtoMove_velocity_max(x,y) / self.move_object.min_move_t
             if total_v > max_velocity:
                 reduction_factor = max_velocity / total_v
                 self.move_object.limit_speed(reduction_factor*math.sqrt(self.move_object.max_cruise_v2),
