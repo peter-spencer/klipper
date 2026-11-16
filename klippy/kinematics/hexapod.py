@@ -434,13 +434,20 @@ class HexapodMove:
             if z_max > abs_endstop:
                 raise self.move_object.move_error("Move out of range (%s above maximum position)." % (rail.get_name()))
             
-            # Now check the maximum velocity of the stepper (the carriage that pushes the arm)
+            # Now check the maximum velocity and acceleration of the stepper rail (the carriage that pushes the arm).
+            # This is important for certain movements close to the edges of the buildplate.
             z_speed = (z_move_max - z_move_min) / self.move_object.min_move_t
             total_v = z_speed + self.get_XYtoMove_velocity_max(x,y) / self.move_object.min_move_t
-            if total_v > max_velocity:
-                reduction_factor = max_velocity / total_v
-                self.move_object.limit_speed(reduction_factor*math.sqrt(self.move_object.max_cruise_v2),
-                                             reduction_factor*self.move_object.accel)
+            total_a = self.get_XYtoMove_acceleration_max(x,y) / self.move_object.min_move_t**2
+            if total_v > max_velocity or total_a > max_accel:
+                # Need to slow down the move if max velocity or max acceleration of stepper during linear move
+                # exceeds the configured limits. The max acceleration here is not the same as the toolhead
+                # acceleration, it is the maximum acceleration of this stepper rail while the toolhead is
+                # moving at a constant linear velocity; therefore, the limit_speed() behaviour is the same
+                # for both too high a velocity and too high an acceleration.
+                slow_r = min([1.0, max_velocity / total_v, max_accel / total_a])
+                self.move_object.limit_speed(slow_r*math.sqrt(self.move_object.max_cruise_v2),
+                                             slow_r*self.move_object.accel)
             
 
     def A(self) -> float:
@@ -480,6 +487,10 @@ class HexapodMove:
         # Acceleration drops to zero
         return self.B(X,Y) / self.A() - self.C(X,Y) / self.B(X,Y)
 
+    def get_XYtoMove_acceleration_extreme(self, X: float, Y: float) -> float:
+        # Jerk drops to zero, it's the same condition as when the velocity drops to zero
+        return self.get_XYtoMove_distance_extreme(X,Y)
+
     def get_XYtoMove_distance_min(self, X: float, Y: float) -> float:
         extreme_point = self.get_XYtoMove_distance_extreme(X, Y)
         if 0.0 < extreme_point < 1.0:
@@ -499,6 +510,16 @@ class HexapodMove:
         extreme_point = self.get_XYtoMove_velocity_extreme(X, Y)
         if 0.0 < extreme_point < 1.0:
             return_candidates.append(self.get_XYtoMove_velocity(X,Y,extreme_point))
+        if preserve_sign:
+            return return_candidates[np.argmax(np.abs(return_candidates))]
+        else:
+            return max([abs(x) for x in return_candidates])
+        
+    def get_XYtoMove_acceleration_max(self, X: float, Y: float, preserve_sign = False) -> float:
+        return_candidates = [self.get_XYtoMove_acceleration(X,Y,0.0), self.get_XYtoMove_acceleration(X,Y,1.0)]
+        extreme_point = self.get_XYtoMove_acceleration_extreme(X, Y)
+        if 0.0 < extreme_point < 1.0:
+            return_candidates.append(self.get_XYtoMove_acceleration(X,Y,extreme_point))
         if preserve_sign:
             return return_candidates[np.argmax(np.abs(return_candidates))]
         else:
