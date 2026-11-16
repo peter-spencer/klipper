@@ -542,7 +542,7 @@ class HexapodRotationAxis:
     def process_move(self, next_move_time, move, axis_index):
         self.commanded_pos = self.kinematics.toolhead.commanded_pos[axis_index]
 
-    def check_move(self, move, axis_index):
+    def check_move(self, move: ToolheadMoveObject, axis_index: int):
         ffi_main, ffi_lib = chelper.get_ffi()
 
         # Get the last rotation axis in this movement
@@ -558,8 +558,8 @@ class HexapodRotationAxis:
 
             move._hexapod_proceed_flag = True
             if not move.is_kinematic_move:
-               # logging.info("Attempted rotation without (X,Y,Z) travel and this is not supported yet.")
                move._hexapod_proceed_flag = False
+               raise move.move_error("Attempted rotation without (X,Y,Z) travel and this is not supported yet.")
 
             if move._hexapod_proceed_flag:
                 for rail in self.kinematics.rails:
@@ -603,8 +603,7 @@ class HexapodRotationAxis:
                     new_end_pos[i] = move.start_pos[i]
                 move.end_pos = tuple(new_end_pos)
 
-                logging.warning("Could not accept rotation move.")
-                move.move_error("Could not accept rotation move")
+                raise move.move_error("Could not accept rotational move.")
 
             else:
 
