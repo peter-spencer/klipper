@@ -55,6 +55,8 @@ command_config_lsm6dsv16x(uint32_t *args)
     ax->timer.func = lsm6dsv16x_event;
     ax->i2c = i2cdev_oid_lookup(args[1]);
 
+    output("lsm6dsv16x config command.")
+
     // Add config parameters here and string in the definition below
 }
 DECL_COMMAND(command_config_lsm6dsv16x, "config_lsm6dsv16x oid=%c i2c_oid=%c");
@@ -68,6 +70,8 @@ command_query_lsm6dsv16x(uint32_t *args)
     if (!args[1])
         // End measurements
         return;
+
+    output("lsm6dsv16x query command.")
 
     // Start new measurements query
     ax->rest_ticks = args[1];
@@ -90,6 +94,8 @@ command_query_lsm6dsv16x_status(uint32_t *args)
     int ret = i2c_dev_read(ax->i2c, sizeof(reg), &reg, sizeof(status), status);
     uint32_t time2 = timer_read_time();
 
+    output("lsm6dsv16x query status.")
+
     uint16_t fifo_words = 0;
     if (!ret) {
         fifo_words = status[0] | ((status[1] & 0x03) << 8);
@@ -105,8 +111,13 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
 {
     uint8_t reg_status = LSM6DSV16X_FIFO_STATUS1;
     uint8_t status[2];
+
+    output("lsm6dsv16x query.")
+
     if (i2c_dev_read(ax->i2c, 1, &reg_status, 2, status) != 0)
         return;
+
+    output("lsm6dsv16x query data is ready.")
 
     uint16_t unread_words = status[0] | ((status[1] & 0x03) << 8);
     if (status[1] & 0x40)
