@@ -4,6 +4,7 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
+import logging
 from . import bus, bulk_sensor, adxl345
 
 LSM6DSV16X_ADDRESS = 0x6B
@@ -97,10 +98,14 @@ class LSM6DSV16X:
         return aqh
 
     def _start_measurements(self):
+        logging.info("Starting accelerometer measurements.")
+        
         # Verify WHO_AM_I (0x0F) == 0x70
         params = self.i2c.i2c_read([LSM6DSV16X_WHO_AM_I], 1)
         if bytearray(params['response'])[0] != LSM6DSV16X_DEVICE_ID:
             raise self.printer.command_error("Invalid LSM6DSV16X WHO_AM_I")
+
+        logging.info("Verified the accelerometer chip ID.")
 
         # Software reset & poll bit 0
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x01])
@@ -111,6 +116,8 @@ class LSM6DSV16X:
                 raise self.printer.command_error("LSM6DSV16X reset timeout")
             reactor.pause(reactor.monotonic() + 0.002)
 
+        logging.info("Accelerometer reset successful.")
+
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # CTRL3
         self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # CTRL8 (+/- 4g)
@@ -118,6 +125,8 @@ class LSM6DSV16X:
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, 0x0A])  # FIFO_CTRL3: BDR_XL = 1.92 kHz
         self.i2c.i2c_write([LSM6DSV16X_CTRL4, 0x06])  # FIFO_CTRL4: Continuous mode
         self.i2c.i2c_write([LSM6DSV16X_CTRL1, 0x0A])  # CTRL1: 1.92 kHz High-Performance
+
+        logging.info("Accelerometer setup completed.")
 
         # Start MCU timer polling every ~2.5 ms (5 samples at 1.92 kHz)
         rest_ticks = self.mcu.seconds_to_clock(4.0 / self.data_rate)
