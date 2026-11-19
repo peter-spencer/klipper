@@ -87,7 +87,7 @@ command_query_lsm6dsv16x_status(uint32_t *args)
     uint8_t reg = LSM6DSV16X_FIFO_STATUS1;
     uint8_t status[2];
     uint32_t time1 = timer_read_time();
-    int ret = i2c_read(ax->i2c, sizeof(reg), &reg, sizeof(status), status);
+    int ret = i2c_dev_read(ax->i2c, sizeof(reg), &reg, sizeof(status), status);
     uint32_t time2 = timer_read_time();
 
     uint16_t fifo_words = 0;
@@ -105,7 +105,7 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
 {
     uint8_t reg_status = LSM6DSV16X_FIFO_STATUS1;
     uint8_t status[2];
-    if (i2c_read(ax->i2c, 1, &reg_status, 2, status) != 0)
+    if (i2c_dev_read(ax->i2c, 1, &reg_status, 2, status) != 0)
         return;
 
     uint16_t unread_words = status[0] | ((status[1] & 0x03) << 8);
@@ -120,7 +120,7 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     uint8_t raw_buf[6 * BYTES_PER_FIFO_WORD];
     uint8_t read_bytes = words_to_read * BYTES_PER_FIFO_WORD;
 
-    if (i2c_read(ax->i2c, 1, &reg_data, read_bytes, raw_buf) != 0)
+    if (i2c_dev_read(ax->i2c, 1, &reg_data, read_bytes, raw_buf) != 0)
         return;
 
     // Strip the 1-byte FIFO tag and pack 6-byte XYZ samples into sensor_bulk
