@@ -83,7 +83,7 @@ query_fifo_status(struct lsm6dsv16x *ax)
     if (status[1] & 0x40)
         ax->sb.possible_overflows++;
 
-    ax->fifo_bytes_pending = unread_words * BYTES_PER_SAMPLE;
+    ax->fifo_bytes_pending = ax->unread_words * BYTES_PER_SAMPLE;
     return 0;
 }
 
