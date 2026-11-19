@@ -147,7 +147,7 @@ class LSM6DSV16X:
         samples = self.ffreader.pull_samples()
         self._convert_samples(samples)
         if not self.batch_processed:
-            logging.info("Completed first batch processing, %d samples processed."%(len(samples)))
+            logging.info("Completed first batch processing, %d samples processed, %d errors, %d overflows."%(len(samples), self.last_error_count, self.ffreader.get_last_overflows()))
             self.batch_processed = True
         if not samples:
             return {}
