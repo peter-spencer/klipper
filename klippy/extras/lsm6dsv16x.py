@@ -52,7 +52,7 @@ class LSM6DSV16X:
         self.printer = config.get_printer()
         adxl345.AccelCommandHelper(config, self)
         self.axes_map = adxl345.read_axes_map(config, SCALE_4G, SCALE_4G, SCALE_4G)
-        self.data_rate = 1920
+        self.data_rate = 120
 
         # Setup I2C (default 400 kHz, address 0x6A)
         self.i2c = bus.MCU_I2C_from_config(
@@ -122,8 +122,8 @@ class LSM6DSV16X:
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
         self.i2c.i2c_write([LSM6DSV16X_CTRL2, 0x0])  # Gyroscope powered down
-        self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # CTRL3
-        self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # CTRL8 (+/- 4g)
+        self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # Block data update enable
+        self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # Set full scale +/- 4g
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, 0x00])  # FIFO_CTRL4: Bypass mode (flush)
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, 0x0A])  # FIFO_CTRL3: BDR_XL = 1.92 kHz
         self.i2c.i2c_write([LSM6DSV16X_CTRL4, 0x06])  # FIFO_CTRL4: Continuous mode
