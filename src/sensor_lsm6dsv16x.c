@@ -112,7 +112,7 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     uint8_t reg_status = LSM6DSV16X_FIFO_STATUS1;
     uint8_t status[2];
 
-    output("lsm6dsv16x query.")
+    output("lsm6dsv16x query.");
 
     if (i2c_dev_read(ax->i2c, 1, &reg_status, 2, status) != 0)
         return;
