@@ -15,6 +15,7 @@
 #define TAG_ACCEL_NC          0x02
 #define BYTES_PER_FIFO_WORD   7
 #define BYTES_PER_SAMPLE      6
+#define SAMPLES_PER_BLOCK     8 // Limited by fitting 6 bytes into the 51 byte block
 
 struct lsm6dsv16x {
     struct timer timer;
@@ -96,10 +97,10 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     if(ax->unread_words == 0)
         return;
 
-    // Read up to 6 words (42 bytes) per task pass to keep I2C transactions short
-    uint8_t words_to_read = ax->unread_words >= 6 ? 6 : ax->unread_words;
+    // Read up to SAMPLES_PER_BLOCK words per task pass to keep I2C transactions short
+    uint8_t words_to_read = ax->unread_words >= SAMPLES_PER_BLOCK ? SAMPLES_PER_BLOCK : ax->unread_words;
     uint8_t reg_data = LSM6DSV16X_FIFO_DATA_OUT_TAG;
-    uint8_t raw_buf[6 * BYTES_PER_FIFO_WORD];
+    uint8_t raw_buf[SAMPLES_PER_BLOCK * BYTES_PER_FIFO_WORD];
     uint8_t read_bytes = words_to_read * BYTES_PER_FIFO_WORD;
 
     if (i2c_dev_read(ax->i2c, 1, &reg_data, read_bytes, raw_buf) != 0)
