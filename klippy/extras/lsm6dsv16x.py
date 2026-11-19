@@ -76,7 +76,7 @@ class LSM6DSV16X:
         mcu.register_config_callback(self._build_config)
 
         # Register FixedFreqReader with little-endian signed 16-bit XYZ ('<hhh')
-        chip_smooth = self.data_rate * BATCH_UPDATES * 2
+        chip_smooth = self.data_rate * BATCH_UPDATES
         self.ffreader = bulk_sensor.FixedFreqReader(mcu, chip_smooth, "<hhh")
         self.batch_bulk = bulk_sensor.BatchBulkHelper(
             self.printer, self._process_batch,
