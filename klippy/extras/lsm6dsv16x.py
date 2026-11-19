@@ -47,6 +47,8 @@ SCALE_4G = 0.000122 * FREEFALL_ACCEL
 
 class LSM6DSV16X:
     def __init__(self, config):
+        self.last_error_count = 0
+        self.batch_processed = False
         self.printer = config.get_printer()
         adxl345.AccelCommandHelper(config, self)
         self.axes_map = adxl345.read_axes_map(config, SCALE_4G, SCALE_4G, SCALE_4G)
@@ -132,6 +134,7 @@ class LSM6DSV16X:
         rest_ticks = self.mcu.seconds_to_clock(4.0 / self.data_rate)
         self.query_lsm6dsv16x_cmd.send([self.oid, rest_ticks])
         self.ffreader.note_start()
+        self.last_error_count = 0
 
     def _stop_measurements(self):
         self.query_lsm6dsv16x_cmd.send_wait_ack([self.oid, 0])
@@ -139,9 +142,17 @@ class LSM6DSV16X:
         self.i2c.i2c_write([LSM6DSV16X_CTRL1, 0x00])  # Power-down accelerometer
 
     def _process_batch(self, eventtime):
+        if not self.batch_processed:
+            logging.info("Started first batch processing...")
         samples = self.ffreader.pull_samples()
         self._convert_samples(samples)
-        return {'data': samples}
+        if not self.batch_processed:
+            logging.info("Completed first batch processing, %d samples processed."%(len(samples)))
+            self.batch_processed = True
+        if not samples:
+            return {}
+        return {'data': samples, 'errors': self.last_error_count,
+                'overflows': self.ffreader.get_last_overflows()}
 
     def _convert_samples(self, samples):
         (x_pos, x_scale), (y_pos, y_scale), (z_pos, z_scale) = self.axes_map
