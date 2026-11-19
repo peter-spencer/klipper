@@ -121,6 +121,7 @@ class LSM6DSV16X:
         logging.info("Accelerometer reset successful.")
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
+        self.i2c.i2c_write([LSM6DSV16X_CTRL2, 0x0])  # Gyroscope powered down
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # CTRL3
         self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # CTRL8 (+/- 4g)
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, 0x00])  # FIFO_CTRL4: Bypass mode (flush)
