@@ -123,7 +123,7 @@ class LSM6DSV16X:
         logging.info("Accelerometer reset successful.")
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
-        self.i2c.i2c_write([LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0]]])  # Gyroscope powered down
+        self.i2c.i2c_write([LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0]])  # Gyroscope powered down
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # Block data update enable
         self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # Set full scale +/- 4g
         # self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL1, 10])  # FIFO_CTRL1: Set watermark to 10 measurements
