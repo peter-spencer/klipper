@@ -91,6 +91,11 @@ class LSM6DSV16X:
             "query_lsm6dsv16x_status oid=%c", oid=self.oid, cq=cmdqueue
         )
 
+    def start_internal_client(self):
+        aqh = adxl345.AccelQueryHelper(self.printer)
+        self.batch_bulk.add_client(aqh.handle_batch)
+        return aqh
+
     def _start_measurements(self):
         # Verify WHO_AM_I (0x0F) == 0x70
         params = self.i2c.i2c_read([LSM6DSV16X_WHO_AM_I], 1)
