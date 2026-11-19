@@ -31,16 +31,23 @@ LSM6DSV16X_CTRL10 = 0x19
 LSM6DSV16X_CTRL_STATUS = 0x1A
 LSM6DSV16X_FIFO_STATUS1 = 0x1B
 LSM6DSV16X_FIFO_STATUS2 = 0X1C
+LSM6DSV16X_HAODR_CFG = 0x62
 
 LSM6DSV16X_DATA_RATES = {
     0: 0x0, 1.875: 0x1, 7.5: 0x2, 15: 0x3, 30: 0x4, 60: 0x5, 120: 0x6, 240: 0x7,
-    480: 0x8, 960: 0x9, 1920: 0xA, 3840: 0xB, 7680: 0xC, 15.625: 0x13,
-    31.25: 0x14, 62.5: 0x15, 125: 0x16, 250: 0x17, 500: 0x18, 1000: 0x19,
-    2000: 0x1A, 4000: 0x1B, 8000: 0x1C, 12.5: 0x23, 25: 0x24, 50: 0x25,
-    100: 0x26, 200: 0x27, 400: 0x28, 800: 0x29, 1600: 0x2A, 3200: 0x2B, 6400: 0x2C
+    480: 0x8, 960: 0x9, 1920: 0xA, 3840: 0xB, 7680: 0xC, 15.625: 0x3,
+    31.25: 0x4, 62.5: 0x5, 125: 0x6, 250: 0x7, 500: 0x8, 1000: 0x9,
+    2000: 0xA, 4000: 0xB, 8000: 0xC, 12.5: 0x3, 25: 0x4, 50: 0x5,
+    100: 0x6, 200: 0x7, 400: 0x8, 800: 0x9, 1600: 0xA, 3200: 0xB, 6400: 0xC
 }
 
-LSM6DSV16X_ACCEL_RATES = [0,1.875,7.5,15,30,60,120,240,480,960,1920,3840,7680]
+LSM6DSV16X_HAODR_CFGS = {
+    0: 0, 1.875: 0, 7.5: 0, 15: 0, 30: 0, 60: 0, 120: 0, 240: 0,
+    480: 0, 960: 0, 1920: 0, 3840: 0, 7680: 0, 15.625: 1,
+    31.25: 1, 62.5: 1, 125: 1, 250: 1, 500: 1, 1000: 1,
+    2000: 1, 4000: 1, 8000: 1, 12.5: 2, 25: 2, 50: 2,
+    100: 2, 200: 2, 400: 2, 800: 2, 1600: 2, 3200: 2, 6400: 2
+}
 
 LSM6DSV16X_MODE = { 'BYPASS': 0, 'FIFO': 1, 'STREAM_WTM_TO_FULL': 2,
                    'STREAM_TO_FIFO': 3, 'BYPASS TO STREAM': 4, 'STREAM': 6,
@@ -57,7 +64,7 @@ class LSM6DSV16X:
         self.printer = config.get_printer()
         adxl345.AccelCommandHelper(config, self)
         self.axes_map = adxl345.read_axes_map(config, SCALE_4G, SCALE_4G, SCALE_4G)
-        self.data_rate = 1920
+        self.data_rate = config.getint('rate', 1600)
 
         # Setup I2C (default 400 kHz, address 0x6A)
         self.i2c = bus.MCU_I2C_from_config(
@@ -127,7 +134,9 @@ class LSM6DSV16X:
         # logging.info("Accelerometer reset successful.")
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
-        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate]])  # CTRL1: 1.92 kHz High-Performance
+        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0]])  # Accelerometer powered down
+        self.i2c.i2c_write([LSM6DSV16X_HAODR_CFG, LSM6DSV16X_HAODR_CFGS[self.data_rate]])  # Set for high accuracy data rate if needed
+        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate]])  # Set accelerometer output data rate
         self.i2c.i2c_write([LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0]])  # Gyroscope powered down
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # Block data update and IF_INC enable
         self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # Set full scale +/- 4g
