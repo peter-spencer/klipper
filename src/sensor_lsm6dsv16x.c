@@ -11,7 +11,7 @@
 // #include "st_src/lsm6dsv16x.h"
 
 #define LSM6DSV16X_FIFO_STATUS1      0x1B
-#define REG_FIFO_DATA_OUT_TAG 0x78
+#define LSM6DSV16X_FIFO_DATA_OUT_TAG 0x78
 #define TAG_ACCEL_NC          0x02
 #define BYTES_PER_FIFO_WORD   7
 #define BYTES_PER_SAMPLE      6
@@ -21,12 +21,15 @@ struct lsm6dsv16x {
     uint32_t rest_ticks;
     struct i2cdev_s *i2c;
     uint8_t flags;
+    uint16_t unread_words;
+    uint8_t fifo_bytes_pending;
+    uint32_t time1;
+    uint32_t time2;
     struct sensor_bulk sb;
 };
 
 enum {
-    AX_HAVE_START = 1<<0,
-    AX_RUNNING    = 1<<1,
+    LSM_PENDING = 1<<0,
 };
 
 static struct task_wake lsm6dsv16x_wake;
@@ -35,109 +38,72 @@ static uint_fast8_t
 lsm6dsv16x_event(struct timer *timer)
 {
     struct lsm6dsv16x *ax = container_of(timer, struct lsm6dsv16x, timer);
-    uint32_t rest_ticks = ax->rest_ticks;
-    uint8_t flags = ax->flags;
-
-    // Does the LSM6DSV16X need a wake task?
-    if (flags & AX_HAVE_START) {
-        sched_wake_task(&lsm6dsv16x_wake);
-        flags &= ~AX_HAVE_START;
-        ax->flags = flags;
-    }
-    ax->timer.waketime += rest_ticks;
-    return SF_RESCHEDULE;
+    ax->flags |= LSM_PENDING;
+    sched_wake_task(&lis2dw_wake);
+    return SF_DONE;
 }
 
 void
-command_config_lsm6dsv16x(uint32_t *args)
+lsm6dsv16x_task(void)
 {
-    struct lsm6dsv16x *ax = oid_alloc(args[0], command_config_lsm6dsv16x, sizeof(*ax));
-    ax->timer.func = lsm6dsv16x_event;
-    ax->i2c = i2cdev_oid_lookup(args[1]);
-
-    output("lsm6dsv16x config command.");
-
-    // Add config parameters here and string in the definition below
-}
-DECL_COMMAND(command_config_lsm6dsv16x, "config_lsm6dsv16x oid=%c i2c_oid=%c");
-
-void
-command_query_lsm6dsv16x(uint32_t *args)
-{
-    struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
-    sched_del_timer(&ax->timer);
-    ax->flags = 0;
-    if (!args[1])
-        // End measurements
+    if (!sched_check_wake(&lsm6dsv16x_wake))
         return;
+    uint8_t oid;
+    struct lsm6dsv16x *ax;
+    foreach_oid(oid, ax, command_config_lsm6dsv16x) {
+        uint_fast8_t flags = ax->flags;
+        if (flags & LSM_PENDING)
+            lsm6dsv16x_query(ax, oid);
+    }
+}
+DECL_TASK(lsm6dsv16x_task);
 
-    output("lsm6dsv16x query command.");
-
-    // Start new measurements query
-    ax->rest_ticks = args[1];
-    sensor_bulk_reset(&ax->sb);
+// Schedule collecting data from the accelerometer FIFO
+static void
+lsm6dsv16x_reschedule_timer(struct lsm6dsv16x *ax)
+{
     irq_disable();
     ax->timer.waketime = timer_read_time() + ax->rest_ticks;
     sched_add_timer(&ax->timer);
-    ax->flags = AX_HAVE_START | AX_RUNNING;
     irq_enable();
 }
-DECL_COMMAND(command_query_lsm6dsv16x, "query_lsm6dsv16x oid=%c rest_ticks=%u");
 
-void
-command_query_lsm6dsv16x_status(uint32_t *args)
-{
-    struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
-    uint8_t reg = LSM6DSV16X_FIFO_STATUS1;
-    uint8_t status[2];
-    uint32_t time1 = timer_read_time();
-    int ret = i2c_dev_read(ax->i2c, sizeof(reg), &reg, sizeof(status), status);
-    uint32_t time2 = timer_read_time();
-
-    output("lsm6dsv16x query status.");
-
-    uint16_t fifo_words = 0;
-    if (!ret) {
-        fifo_words = status[0] | ((status[1] & 0x03) << 8);
-        output("lsm6dsv16x query status returned %u/%u, %u FIFO words ready.", status[0], status[1], fifo_words);
-        if (status[1] & 0x40) {
-            ax->sb.possible_overflows++;
-            output("lsm6dsv16x possible overflow.");
-        }
-    } else {
-        output("lsm6dsv16x problem with query status.");
-    }
-
-    reg = 0x0F;
-    ret = i2c_dev_read(ax->i2c, sizeof(reg), &reg, sizeof(status), status);
-    output("lsm6dsv16x query status WHO AM I check returned %u/%u (device ID should be 112).", status[0], status[1]);
-
-    sensor_bulk_status(&ax->sb, args[0], time1, time2, fifo_words * BYTES_PER_SAMPLE);
-}
-DECL_COMMAND(command_query_lsm6dsv16x_status, "query_lsm6dsv16x_status oid=%c");
-
-static void
-lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
+// Query fifo status register
+static int
+query_fifo_status(struct lsm6dsv16x *ax)
 {
     uint8_t reg_status = LSM6DSV16X_FIFO_STATUS1;
     uint8_t status[2];
 
-    output("lsm6dsv16x query.");
+    ax->time1 = timer_read_time();
+    int ret = i2c_dev_read(ax->i2c, 1, &reg_status, 2, status);
+    ax->time2 = timer_read_time();
 
-    if (i2c_dev_read(ax->i2c, 1, &reg_status, 2, status) != 0)
-        return;
+    if (ret != 0)
+        ax->unread_words = 0;
+        ax->fifo_bytes_pending = 0;
+        return ret;
 
-    output("lsm6dsv16x query data is ready.");
-
-    uint16_t unread_words = status[0] | ((status[1] & 0x03) << 8);
+    ax->unread_words = status[0] | ((status[1] & 0x03) << 8);
     if (status[1] & 0x40)
         ax->sb.possible_overflows++;
-    if (!unread_words)
+
+    ax->fifo_bytes_pending = unread_words * BYTES_PER_SAMPLE;
+    return 0;
+}
+
+static void
+lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
+{
+    if(query_fifo_status(ax) != 0)
+        return;
+
+    if(ax->unread_words == 0)
         return;
 
     // Read up to 6 words (42 bytes) per task pass to keep I2C transactions short
-    uint8_t words_to_read = unread_words > 6 ? 6 : unread_words;
-    uint8_t reg_data = REG_FIFO_DATA_OUT_TAG;
+    uint8_t words_to_read = ax->fifo_words_pending > 6 ? 6 : ax->fifo_words_pending;
+    uint8_t reg_data = LSM6DSV16X_FIFO_DATA_OUT_TAG;
     uint8_t raw_buf[6 * BYTES_PER_FIFO_WORD];
     uint8_t read_bytes = words_to_read * BYTES_PER_FIFO_WORD;
 
@@ -157,29 +123,52 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     }
 
     // Reschedule immediately if more words remain in FIFO
-    if (unread_words > words_to_read) {
-        ax->flags |= AX_HAVE_START;
+    if (ax->fifo_words_pending > words_to_read) {
         sched_wake_task(&lsm6dsv16x_wake);
     } else {
-        ax->flags |= AX_HAVE_START;
+        ax->flags &= ~LSM_PENDING;
+        lsm6dsv16x_reschedule_timer(ax);
     }
 }
 
 void
-lsm6dsv16x_task(void)
+command_query_lsm6dsv16x(uint32_t *args)
 {
-    if (!sched_check_wake(&lsm6dsv16x_wake))
+    struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
+
+    sched_del_timer(&ax->timer);
+    ax->flags = 0;
+    if (!args[1])
+        // End measurements
         return;
-    uint8_t oid;
-    struct lsm6dsv16x *ax;
-    foreach_oid(oid, ax, command_config_lsm6dsv16x) {
-        uint_fast8_t flags = ax->flags;
-        if (!(flags & AX_RUNNING))
-            continue;
-        if (flags & AX_HAVE_START) {
-            ax->flags = flags & ~AX_HAVE_START;
-            lsm6dsv16x_query(ax, oid);
-        }
-    }
+
+    // Start new measurements query
+    ax->rest_ticks = args[1];
+    ax->fifo_bytes_pending = 0;
+    ax->unread_words = 0;
+    sensor_bulk_reset(&ax->sb);
+
+    // Schedule collecting data from the accelerometer FIFO
+    lsm6dsv16x_reschedule_timer(ax);
 }
-DECL_TASK(lsm6dsv16x_task);
+DECL_COMMAND(command_query_lsm6dsv16x, "query_lsm6dsv16x oid=%c rest_ticks=%u");
+
+void
+command_query_lsm6dsv16x_status(uint32_t *args)
+{
+    struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
+    query_fifo_status(ax);
+    sensor_bulk_status(&ax->sb, args[0], ax->time1, ax->time2 - ax->time1, ax->fifo_words_pending * BYTES_PER_SAMPLE);
+}
+DECL_COMMAND(command_query_lsm6dsv16x_status, "query_lsm6dsv16x_status oid=%c");
+
+void
+command_config_lsm6dsv16x(uint32_t *args)
+{
+    struct lsm6dsv16x *ax = oid_alloc(args[0], command_config_lsm6dsv16x, sizeof(*ax));
+    ax->timer.func = lsm6dsv16x_event;
+    ax->i2c = i2cdev_oid_lookup(args[1]);
+}
+DECL_COMMAND(command_config_lsm6dsv16x, "config_lsm6dsv16x oid=%c i2c_oid=%c");
+
+

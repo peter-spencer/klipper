@@ -49,10 +49,11 @@ LSM6DSV16X_MODE = { 'BYPASS': 0, 'FIFO': 1, 'STREAM_WTM_TO_FULL': 2,
 FREEFALL_ACCEL = 9.80665 * 1000.0
 SCALE_4G = 0.000122 * FREEFALL_ACCEL
 
+BATCH_UPDATES = 0.100
+
 class LSM6DSV16X:
     def __init__(self, config):
         self.last_error_count = 0
-        self.batch_processed = False
         self.printer = config.get_printer()
         adxl345.AccelCommandHelper(config, self)
         self.axes_map = adxl345.read_axes_map(config, SCALE_4G, SCALE_4G, SCALE_4G)
@@ -75,11 +76,12 @@ class LSM6DSV16X:
         mcu.register_config_callback(self._build_config)
 
         # Register FixedFreqReader with little-endian signed 16-bit XYZ ('<hhh')
-        self.ffreader = bulk_sensor.FixedFreqReader(mcu, self.data_rate, "<hhh")
+        chip_smooth = self.data_rate * BATCH_UPDATES * 2
+        self.ffreader = bulk_sensor.FixedFreqReader(mcu, chip_smooth, "<hhh")
         self.batch_bulk = bulk_sensor.BatchBulkHelper(
             self.printer, self._process_batch,
             self._start_measurements, self._stop_measurements,
-            batch_interval=0.100
+            batch_interval=BATCH_UPDATES
         )
         self.name = config.get_name().split()[-1]
         
@@ -104,14 +106,14 @@ class LSM6DSV16X:
         return aqh
 
     def _start_measurements(self):
-        logging.info("Starting accelerometer measurements.")
+        # logging.info("Starting accelerometer measurements.")
         
         # Verify WHO_AM_I (0x0F) == 0x70
         params = self.i2c.i2c_read([LSM6DSV16X_WHO_AM_I], 1)
         if bytearray(params['response'])[0] != LSM6DSV16X_DEVICE_ID:
             raise self.printer.command_error("Invalid LSM6DSV16X WHO_AM_I")
 
-        logging.info("Verified the accelerometer chip ID.")
+        # logging.info("Verified the accelerometer chip ID.")
 
         # Software reset & poll bit 0
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x01])
@@ -122,7 +124,7 @@ class LSM6DSV16X:
                 raise self.printer.command_error("LSM6DSV16X reset timeout")
             reactor.pause(reactor.monotonic() + 0.002)
 
-        logging.info("Accelerometer reset successful.")
+        # logging.info("Accelerometer reset successful.")
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
         self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate]])  # CTRL1: 1.92 kHz High-Performance
@@ -133,7 +135,7 @@ class LSM6DSV16X:
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, LSM6DSV16X_DATA_RATES[self.data_rate]])  # FIFO_CTRL3: Accelerometer Batched Data Rate
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['STREAM']])  # FIFO_CTRL4: Continuous mode
 
-        logging.info("Accelerometer setup completed.")
+        # logging.info("Accelerometer setup completed.")
 
         # Start MCU timer polling every ~2.5 ms (5 samples at 1.92 kHz)
         rest_ticks = self.mcu.seconds_to_clock(4.0 / self.data_rate)
@@ -144,16 +146,12 @@ class LSM6DSV16X:
     def _stop_measurements(self):
         self.query_lsm6dsv16x_cmd.send_wait_ack([self.oid, 0])
         self.ffreader.note_end()
-        self.i2c.i2c_write([LSM6DSV16X_CTRL1, 0x00])  # Power-down accelerometer
+        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0]])  # Power-down accelerometer
 
     def _process_batch(self, eventtime):
-        # if not self.batch_processed:
-        #     logging.info("Started first batch processing...")
         samples = self.ffreader.pull_samples()
         self._convert_samples(samples)
-        # if not self.batch_processed:
         logging.info("Batch processing, %d samples processed, %d errors, %d overflows."%(len(samples), self.last_error_count, self.ffreader.get_last_overflows()))
-        # self.batch_processed = True
         if not samples:
             return {}
         return {'data': samples, 'errors': self.last_error_count,
