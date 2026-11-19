@@ -31,6 +31,16 @@ LSM6DSV16X_CTRL_STATUS = 0x1A
 LSM6DSV16X_FIFO_STATUS1 = 0x1B
 LSM6DSV16X_FIFO_STATUS2 = 0X1C
 
+LSM6DSV16X_DATA_RATES = {
+    0: 0x0, 1.875: 0x1, 7.5: 0x2, 15: 0x3, 30: 0x4, 60: 0x5, 120: 0x6, 240: 0x7,
+    480: 0x8, 960: 0x9, 1920: 0xA, 3840: 0xB, 7680: 0xC, 15.625: 0x13,
+    31.25: 0x14, 62.5: 0x15, 125: 0x16, 250: 0x17, 500: 0x18, 1000: 0x19,
+    2000: 0x1A, 4000: 0x1B, 8000: 0x1C, 12.5: 0x23, 25: 0x24, 50: 0x25,
+    100: 0x26, 200: 0x27, 400: 0x28, 800: 0x29, 1600: 0x2A, 3200: 0x2B, 6400: 0x2C
+}
+
+LSM6DSV16X_ACCEL_RATES = [0,1.875,7.5,15,30,60,120,240,480,960,1920,3840,7680]
+
 FREEFALL_ACCEL = 9.80665 * 1000.0
 SCALE_4G = 0.000122 * FREEFALL_ACCEL
 
@@ -43,7 +53,7 @@ class LSM6DSV16X:
 
         # Setup I2C (default 400 kHz, address 0x6A)
         self.i2c = bus.MCU_I2C_from_config(
-            config, default_addr=0x6A, default_speed=400000
+            config, default_addr=LSM6DSV16X_ADDRESS, default_speed=400000
         )
         self.mcu = mcu = self.i2c.get_mcu()
         self.oid = oid = mcu.create_oid()
@@ -65,6 +75,11 @@ class LSM6DSV16X:
             batch_interval=0.100
         )
         self.name = config.get_name().split()[-1]
+        
+        hdr = ('time', 'x_acceleration', 'y_acceleration', 'z_acceleration')
+        self.batch_bulk.add_mux_endpoint("lsm6dsv16x/dump_lsm6dsv16x", "sensor",
+                                         self.name, {'header': hdr})
+        
         self.printer.add_object("lsm6dsv16x " + self.name, self)
 
     def _build_config(self):
@@ -78,26 +93,26 @@ class LSM6DSV16X:
 
     def _start_measurements(self):
         # Verify WHO_AM_I (0x0F) == 0x70
-        params = self.i2c.i2c_read([0x0F], 1)
-        if bytearray(params['response'])[0] != 0x70:
+        params = self.i2c.i2c_read([LSM6DSV16X_WHO_AM_I], 1)
+        if bytearray(params['response'])[0] != LSM6DSV16X_DEVICE_ID:
             raise self.printer.command_error("Invalid LSM6DSV16X WHO_AM_I")
 
         # Software reset & poll bit 0
-        self.i2c.i2c_write([0x12, 0x01])
+        self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x01])
         reactor = self.printer.get_reactor()
         deadline = reactor.monotonic() + 0.100
-        while bytearray(self.i2c.i2c_read([0x12], 1)['response'])[0] & 0x01:
+        while bytearray(self.i2c.i2c_read([LSM6DSV16X_CTRL3], 1)['response'])[0] & 0x01:
             if reactor.monotonic() > deadline:
                 raise self.printer.command_error("LSM6DSV16X reset timeout")
             reactor.pause(reactor.monotonic() + 0.002)
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
-        self.i2c.i2c_write([0x12, 0x44])  # CTRL3
-        self.i2c.i2c_write([0x17, 0x01])  # CTRL8 (+/- 4g)
-        self.i2c.i2c_write([0x0A, 0x00])  # FIFO_CTRL4: Bypass mode (flush)
-        self.i2c.i2c_write([0x09, 0x0A])  # FIFO_CTRL3: BDR_XL = 1.92 kHz
-        self.i2c.i2c_write([0x0A, 0x06])  # FIFO_CTRL4: Continuous mode
-        self.i2c.i2c_write([0x10, 0x0A])  # CTRL1: 1.92 kHz High-Performance
+        self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # CTRL3
+        self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # CTRL8 (+/- 4g)
+        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, 0x00])  # FIFO_CTRL4: Bypass mode (flush)
+        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, 0x0A])  # FIFO_CTRL3: BDR_XL = 1.92 kHz
+        self.i2c.i2c_write([LSM6DSV16X_CTRL4, 0x06])  # FIFO_CTRL4: Continuous mode
+        self.i2c.i2c_write([LSM6DSV16X_CTRL1, 0x0A])  # CTRL1: 1.92 kHz High-Performance
 
         # Start MCU timer polling every ~2.5 ms (5 samples at 1.92 kHz)
         rest_ticks = self.mcu.seconds_to_clock(4.0 / self.data_rate)
@@ -107,7 +122,7 @@ class LSM6DSV16X:
     def _stop_measurements(self):
         self.query_lsm6dsv16x_cmd.send_wait_ack([self.oid, 0])
         self.ffreader.note_end()
-        self.i2c.i2c_write([0x10, 0x00])  # Power-down accelerometer
+        self.i2c.i2c_write([LSM6DSV16X_CTRL1, 0x00])  # Power-down accelerometer
 
     def _process_batch(self, eventtime):
         samples = self.ffreader.pull_samples()

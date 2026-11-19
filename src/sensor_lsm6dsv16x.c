@@ -8,7 +8,9 @@
 #include "sched.h" // DECL_TASK
 #include "sensor_bulk.h" // sensor_bulk_report
 
-#define REG_FIFO_STATUS1      0x1B
+// #include "st_src/lsm6dsv16x.h"
+
+#define LSM6DSV16X_FIFO_STATUS1      0x1B
 #define REG_FIFO_DATA_OUT_TAG 0x78
 #define TAG_ACCEL_NC          0x02
 #define BYTES_PER_FIFO_WORD   7
@@ -35,6 +37,8 @@ lsm6dsv16x_event(struct timer *timer)
     struct lsm6dsv16x *ax = container_of(timer, struct lsm6dsv16x, timer);
     uint32_t rest_ticks = ax->rest_ticks;
     uint8_t flags = ax->flags;
+
+    // Does the LSM6DSV16X need a wake task?
     if (flags & AX_HAVE_START) {
         sched_wake_task(&lsm6dsv16x_wake);
         flags &= ~AX_HAVE_START;
@@ -50,6 +54,8 @@ command_config_lsm6dsv16x(uint32_t *args)
     struct lsm6dsv16x *ax = oid_alloc(args[0], command_config_lsm6dsv16x, sizeof(*ax));
     ax->timer.func = lsm6dsv16x_event;
     ax->i2c = i2cdev_oid_lookup(args[1]);
+
+    // Add config parameters here and string in the definition below
 }
 DECL_COMMAND(command_config_lsm6dsv16x, "config_lsm6dsv16x oid=%c i2c_oid=%c");
 
@@ -78,10 +84,10 @@ void
 command_query_lsm6dsv16x_status(uint32_t *args)
 {
     struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
-    uint8_t reg = REG_FIFO_STATUS1;
+    uint8_t reg = LSM6DSV16X_FIFO_STATUS1;
     uint8_t status[2];
     uint32_t time1 = timer_read_time();
-    int ret = i2c_read(ax->i2c->i2c_config, sizeof(reg), &reg, sizeof(status), status);
+    int ret = i2c_read(ax->i2c, sizeof(reg), &reg, sizeof(status), status);
     uint32_t time2 = timer_read_time();
 
     uint16_t fifo_words = 0;
@@ -97,9 +103,9 @@ DECL_COMMAND(command_query_lsm6dsv16x_status, "query_lsm6dsv16x_status oid=%c");
 static void
 lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
 {
-    uint8_t reg_status = REG_FIFO_STATUS1;
+    uint8_t reg_status = LSM6DSV16X_FIFO_STATUS1;
     uint8_t status[2];
-    if (i2c_read(ax->i2c->i2c_config, 1, &reg_status, 2, status) != 0)
+    if (i2c_read(ax->i2c, 1, &reg_status, 2, status) != 0)
         return;
 
     uint16_t unread_words = status[0] | ((status[1] & 0x03) << 8);
@@ -114,7 +120,7 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     uint8_t raw_buf[6 * BYTES_PER_FIFO_WORD];
     uint8_t read_bytes = words_to_read * BYTES_PER_FIFO_WORD;
 
-    if (i2c_read(ax->i2c->i2c_config, 1, &reg_data, read_bytes, raw_buf) != 0)
+    if (i2c_read(ax->i2c, 1, &reg_data, read_bytes, raw_buf) != 0)
         return;
 
     // Strip the 1-byte FIFO tag and pack 6-byte XYZ samples into sensor_bulk
