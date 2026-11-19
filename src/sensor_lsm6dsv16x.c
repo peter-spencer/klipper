@@ -108,6 +108,10 @@ command_query_lsm6dsv16x_status(uint32_t *args)
         output("lsm6dsv16x problem with query status.");
     }
 
+    reg = 0x2C;
+    ret = i2c_dev_read(ax->i2c, sizeof(reg), &reg, sizeof(status), status);
+    output("lsm6dsv16x query status Z raw data check returned %u/%u.", status[0], status[1]);
+
     sensor_bulk_status(&ax->sb, args[0], time1, time2, fifo_words * BYTES_PER_SAMPLE);
 }
 DECL_COMMAND(command_query_lsm6dsv16x_status, "query_lsm6dsv16x_status oid=%c");

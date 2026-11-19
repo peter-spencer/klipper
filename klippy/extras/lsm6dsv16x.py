@@ -42,6 +42,8 @@ LSM6DSV16X_DATA_RATES = {
 
 LSM6DSV16X_ACCEL_RATES = [0,1.875,7.5,15,30,60,120,240,480,960,1920,3840,7680]
 
+LSM6DSV16X_STREAM_MODE = 0x06
+
 FREEFALL_ACCEL = 9.80665 * 1000.0
 SCALE_4G = 0.000122 * FREEFALL_ACCEL
 
@@ -121,14 +123,14 @@ class LSM6DSV16X:
         logging.info("Accelerometer reset successful.")
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
-        self.i2c.i2c_write([LSM6DSV16X_CTRL2, 0x0])  # Gyroscope powered down
+        self.i2c.i2c_write([LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0]]])  # Gyroscope powered down
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # Block data update enable
         self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # Set full scale +/- 4g
-        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, 10])  # FIFO_CTRL1: Set watermark to 10 measurements
+        # self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL1, 10])  # FIFO_CTRL1: Set watermark to 10 measurements
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, 0x00])  # FIFO_CTRL4: Bypass mode (flush)
-        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, 0x0A])  # FIFO_CTRL3: BDR_XL = 1.92 kHz
-        self.i2c.i2c_write([LSM6DSV16X_CTRL4, 0x06])  # FIFO_CTRL4: Continuous mode
-        self.i2c.i2c_write([LSM6DSV16X_CTRL1, 0x0A])  # CTRL1: 1.92 kHz High-Performance
+        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, LSM6DSV16X_DATA_RATES[self.data_rate]])  # FIFO_CTRL3: Accelerometer Batched Data Rate
+        self.i2c.i2c_write([LSM6DSV16X_CTRL4, LSM6DSV16X_STREAM_MODE])  # FIFO_CTRL4: Continuous mode
+        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate]])  # CTRL1: 1.92 kHz High-Performance
 
         logging.info("Accelerometer setup completed.")
 
