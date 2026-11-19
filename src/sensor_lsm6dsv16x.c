@@ -99,7 +99,7 @@ command_query_lsm6dsv16x_status(uint32_t *args)
     uint16_t fifo_words = 0;
     if (!ret) {
         fifo_words = status[0] | ((status[1] & 0x03) << 8);
-        output("lsm6dsv16x query status returned %x%x, %u FIFO words ready.", status[0], status[1], fifo_words);
+        output("lsm6dsv16x query status returned %u/%u, %u FIFO words ready.", status[0], status[1], fifo_words);
         if (status[1] & 0x40) {
             ax->sb.possible_overflows++;
             output("lsm6dsv16x possible overflow.");
