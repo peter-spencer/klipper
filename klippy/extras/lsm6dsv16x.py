@@ -124,6 +124,7 @@ class LSM6DSV16X:
         self.i2c.i2c_write([LSM6DSV16X_CTRL2, 0x0])  # Gyroscope powered down
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # Block data update enable
         self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # Set full scale +/- 4g
+        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, 10])  # FIFO_CTRL1: Set watermark to 10 measurements
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, 0x00])  # FIFO_CTRL4: Bypass mode (flush)
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, 0x0A])  # FIFO_CTRL3: BDR_XL = 1.92 kHz
         self.i2c.i2c_write([LSM6DSV16X_CTRL4, 0x06])  # FIFO_CTRL4: Continuous mode
