@@ -23,7 +23,7 @@
 
 #define BYTES_PER_FIFO_WORD   7
 #define BYTES_PER_SAMPLE      6
-#define SAMPLES_PER_BLOCK     8 // Limited by fitting 6 bytes into the 51 byte block
+#define SAMPLES_PER_BLOCK     16 // Limited by fitting 6 bytes into the 51 byte block
 
 struct lsm6dsv16x {
     struct timer timer;
@@ -134,7 +134,7 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     }
 
     // Reschedule immediately if more words remain in FIFO
-    if (ax->unread_words >= words_to_read) {
+    if (ax->unread_words >= SAMPLES_PER_BLOCK) {
         sched_wake_task(&lsm6dsv16x_wake);
     } else {
         ax->flags &= ~LSM_PENDING;
