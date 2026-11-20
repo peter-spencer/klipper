@@ -15,11 +15,11 @@
 
 // Accelerometer flag values
 #define TAG_ACCEL_NC             0x02
-#define LSM6DSV16X_FIFO_WTM_IA   0x80 # FIFO is currently above the watermark threshold
-#define LSM6DSV16X_FIFO_OVR_IA   0x40 # FIFO currently overrun
-#define LSM6DSV16X_FIFO_FULL_IA  0x20 # FIFO is full now
-#define LSM6DSV16X_FIFO_LATCHED  0x08 # FIFO overrun since register was last checked
-#define LSM6DSV16X_DIFF_FIFO_8   0x01 # MSB of FIFO length in units of 1 TAG + 6 DATA bytes
+#define LSM6DSV16X_FIFO_WTM_IA   0x80 // FIFO is currently above the watermark threshold
+#define LSM6DSV16X_FIFO_OVR_IA   0x40 // FIFO currently overrun
+#define LSM6DSV16X_FIFO_FULL_IA  0x20 // FIFO is full now
+#define LSM6DSV16X_FIFO_LATCHED  0x08 // FIFO overrun since register was last checked
+#define LSM6DSV16X_DIFF_FIFO_8   0x01 // MSB of FIFO length in units of 1 TAG + 6 DATA bytes
 
 #define BYTES_PER_FIFO_WORD   7
 #define BYTES_PER_SAMPLE      6
