@@ -157,6 +157,8 @@ command_query_lsm6dsv16x(uint32_t *args)
     ax->rest_ticks = args[1];
     ax->fifo_bytes_pending = 0;
     ax->unread_words = 0;
+    ax->time1 = timer_read_time();
+    ax->time2 = ax->time1;
     sensor_bulk_reset(&ax->sb);
 
     // Schedule collecting data from the accelerometer FIFO
@@ -168,13 +170,7 @@ void
 command_query_lsm6dsv16x_status(uint32_t *args)
 {
     struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
-    output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() called.");
-    if(query_fifo_status(ax)==0) {
-        output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() successfully queried FIFO status.");
-        sensor_bulk_status(&ax->sb, args[0], ax->time1, ax->time2 - ax->time1, ax->fifo_bytes_pending);
-        output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() sent sensor_bulk_status report.");
-    }
-    output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() encountered problem querying FIFO status.");
+    sensor_bulk_status(&ax->sb, args[0], ax->time1, ax->time2 - ax->time1, ax->fifo_bytes_pending);
 }
 DECL_COMMAND(command_query_lsm6dsv16x_status, "query_lsm6dsv16x_status oid=%c");
 
