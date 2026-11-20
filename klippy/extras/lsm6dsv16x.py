@@ -112,15 +112,11 @@ class LSM6DSV16X:
         self.batch_bulk.add_client(aqh.handle_batch)
         return aqh
 
-    def _start_measurements(self):
-        # logging.info("Starting accelerometer measurements.")
-        
+    def _start_measurements(self):        
         # Verify WHO_AM_I (0x0F) == 0x70
         params = self.i2c.i2c_read([LSM6DSV16X_WHO_AM_I], 1)
         if bytearray(params['response'])[0] != LSM6DSV16X_DEVICE_ID:
             raise self.printer.command_error("Invalid LSM6DSV16X WHO_AM_I")
-
-        # logging.info("Verified the accelerometer chip ID.")
 
         # Software reset & poll bit 0
         self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x01])
@@ -130,8 +126,6 @@ class LSM6DSV16X:
             if reactor.monotonic() > deadline:
                 raise self.printer.command_error("LSM6DSV16X reset timeout")
             reactor.pause(reactor.monotonic() + 0.002)
-
-        # logging.info("Accelerometer reset successful.")
 
         # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
         self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0]])  # Accelerometer powered down
@@ -143,8 +137,6 @@ class LSM6DSV16X:
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS']])  # FIFO_CTRL4: Bypass mode (flush)
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, LSM6DSV16X_DATA_RATES[self.data_rate]])  # FIFO_CTRL3: Accelerometer Batched Data Rate
         self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['STREAM']])  # FIFO_CTRL4: Continuous mode
-
-        # logging.info("Accelerometer setup completed.")
 
         # Start MCU timer polling every ~2.5 ms (5 samples at 1.92 kHz)
         rest_ticks = self.mcu.seconds_to_clock(4.0 / self.data_rate)
@@ -160,7 +152,6 @@ class LSM6DSV16X:
     def _process_batch(self, eventtime):
         samples = self.ffreader.pull_samples()
         self._convert_samples(samples)
-        #logging.info("Batch processing, %d samples processed, %d errors, %d overflows."%(len(samples), self.last_error_count, self.ffreader.get_last_overflows()))
         if not samples:
             return {}
         return {'data': samples, 'errors': self.last_error_count,
@@ -169,6 +160,7 @@ class LSM6DSV16X:
     def _convert_samples(self, samples):
         (x_pos, x_scale), (y_pos, y_scale), (z_pos, z_scale) = self.axes_map
         count = 0
+        logging.info("Batch processing, %d samples processed, %d errors, %d overflows."%(len(samples), self.last_error_count, self.ffreader.get_last_overflows()))
         for ptime, rx, ry, rz in samples:
             raw_xyz = (rx, ry, rz)
             samples[count] = (
