@@ -150,9 +150,7 @@ class LSM6DSV16X:
         self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0]])  # Power-down accelerometer
 
     def _process_batch(self, eventtime):
-        logging.info("LSM6DSV16X._process_batch() called at %g."%(eventtime))
         samples = self.ffreader.pull_samples()
-        logging.info("Batch processing, %d samples received from ffreader.pull_samples()"%(len(samples)))
         self._convert_samples(samples)
         logging.info("Batch processing, %d samples processed, %d errors, %d overflows."%(len(samples), self.last_error_count, self.ffreader.get_last_overflows()))
         if not samples:

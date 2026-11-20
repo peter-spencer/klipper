@@ -269,19 +269,14 @@ class FixedFreqReader:
     # Convert sensor_bulk_data responses into list of samples
     def pull_samples(self):
         # Query MCU for sample timing and update clock synchronization
-        logging.info("FixedFreqReader.pull_samples() called, about to call self._update_clock().")
         self._update_clock()
-        logging.info("FixedFreqReader.pull_samples(): self._update_clock() successful, about to call self.bulk_queue.pull_queue().")
         # Pull sensor_bulk_data messages from local queue
         raw_samples = self.bulk_queue.pull_queue()
-        logging.info("FixedFreqReader.pull_samples(): self.bulk_queue.pull_queue() returned %d raw samples."%(len(raw_samples)))
         if not raw_samples:
             return []
         # Load variables to optimize inner loop below
         last_sequence = self.last_sequence
-        logging.info("FixedFreqReader.pull_samples(): About to call self.clock_sync.get_time_translation().")
         time_base, chip_base, inv_freq = self.clock_sync.get_time_translation()
-        logging.info("FixedFreqReader.pull_samples(): Completed self.clock_sync.get_time_translation().")
         unpack_from = self.unpack_from
         bytes_per_sample = self.bytes_per_sample
         samples_per_block = self.samples_per_block
@@ -299,8 +294,6 @@ class FixedFreqReader:
                 udata = unpack_from(data, i * bytes_per_sample)
                 samples[count] = (ptime,) + udata
                 count += 1
-        logging.info("FixedFreqReader.pull_samples(): Completed raw sample processing, about to call self.clock_sync.set_last_chip_clock().")
         self.clock_sync.set_last_chip_clock(seq * samples_per_block + i)
-        logging.info("FixedFreqReader.pull_samples(): Completed self.clock_sync.set_last_chip_clock(). Deleting excess and returning.")
         del samples[count:]
         return samples
