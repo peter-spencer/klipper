@@ -168,12 +168,12 @@ void
 command_query_lsm6dsv16x_status(uint32_t *args)
 {
     struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
-    output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() called.")
+    output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() called.");
     if(query_fifo_status(ax)==0)
-        output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() successfully queried FIFO status.")
+        output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() successfully queried FIFO status.");
         sensor_bulk_status(&ax->sb, args[0], ax->time1, ax->time2 - ax->time1, ax->fifo_bytes_pending);
-        output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() sent sensor_bulk_status report.")
-    output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() encountered problem querying FIFO status.")
+        output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() sent sensor_bulk_status report.");
+    output("MCU LSM6DSV16X Driver: command_query_lsm6dsv16x_status() encountered problem querying FIFO status.");
 }
 DECL_COMMAND(command_query_lsm6dsv16x_status, "query_lsm6dsv16x_status oid=%c");
 
