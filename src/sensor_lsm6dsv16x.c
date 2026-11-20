@@ -8,11 +8,19 @@
 #include "sched.h" // DECL_TASK
 #include "sensor_bulk.h" // sensor_bulk_report
 
-// #include "st_src/lsm6dsv16x.h"
 
+// Accelerometer register addresses
 #define LSM6DSV16X_FIFO_STATUS1      0x1B
 #define LSM6DSV16X_FIFO_DATA_OUT_TAG 0x78
-#define TAG_ACCEL_NC          0x02
+
+// Accelerometer flag values
+#define TAG_ACCEL_NC             0x02
+#define LSM6DSV16X_FIFO_WTM_IA   0x80 # FIFO is currently above the watermark threshold
+#define LSM6DSV16X_FIFO_OVR_IA   0x40 # FIFO currently overrun
+#define LSM6DSV16X_FIFO_FULL_IA  0x20 # FIFO is full now
+#define LSM6DSV16X_FIFO_LATCHED  0x08 # FIFO overrun since register was last checked
+#define LSM6DSV16X_DIFF_FIFO_8   0x01 # MSB of FIFO length in units of 1 TAG + 6 DATA bytes
+
 #define BYTES_PER_FIFO_WORD   7
 #define BYTES_PER_SAMPLE      6
 #define SAMPLES_PER_BLOCK     8 // Limited by fitting 6 bytes into the 51 byte block
@@ -68,23 +76,30 @@ static int
 query_fifo_status(struct lsm6dsv16x *ax)
 {
     uint8_t reg_status = LSM6DSV16X_FIFO_STATUS1;
-    uint8_t status[2];
+    uint8_t status[2];  // Also reading LSM6DSV16X_FIFO_STATUS2 at the same time
 
+    // Timed read-out of the FIFO status registers 1 and 2
     ax->time1 = timer_read_time();
     int ret = i2c_dev_read(ax->i2c, 1, &reg_status, 2, status);
     ax->time2 = timer_read_time();
 
+    // Problem with reading the FIFO status registers
     if (ret != 0) {
         ax->unread_words = 0;
         ax->fifo_bytes_pending = 0;
         return ret;
     }
 
-    ax->unread_words = status[0] | ((status[1] & 0x03) << 8);
-    if (status[1] & 0x40)
+    // Get the number of words in the FIFO buffer (1 TAG byte + 6 data bytes)
+    ax->unread_words = status[0] | ((status[1] & LSM6DSV16X_DIFF_FIFO_8) << 8);
+
+    // Convert to number of bytes pending
+    ax->fifo_bytes_pending = ax->unread_words * BYTES_PER_SAMPLE;
+
+    // Check the status bit for FIFO overrun (the immediate, not the latching flag)
+    if (status[1] & LSM6DSV16X_FIFO_OVR_IA)
         ax->sb.possible_overflows++;
 
-    ax->fifo_bytes_pending = ax->unread_words * BYTES_PER_SAMPLE;
     return 0;
 }
 
@@ -153,8 +168,8 @@ void
 command_query_lsm6dsv16x_status(uint32_t *args)
 {
     struct lsm6dsv16x *ax = oid_lookup(args[0], command_config_lsm6dsv16x);
-    query_fifo_status(ax);
-    sensor_bulk_status(&ax->sb, args[0], ax->time1, ax->time2 - ax->time1, ax->fifo_bytes_pending);
+    if(query_fifo_status(ax)==0)
+        sensor_bulk_status(&ax->sb, args[0], ax->time1, ax->time2 - ax->time1, ax->fifo_bytes_pending);
 }
 DECL_COMMAND(command_query_lsm6dsv16x_status, "query_lsm6dsv16x_status oid=%c");
 
