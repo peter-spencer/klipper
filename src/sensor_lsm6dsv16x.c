@@ -23,7 +23,6 @@
 
 #define BYTES_PER_FIFO_WORD   7
 #define BYTES_PER_SAMPLE      6
-#define SAMPLES_PER_BLOCK     16 // Limited by fitting 6 bytes into the 51 byte block
 
 struct lsm6dsv16x {
     struct timer timer;
@@ -34,6 +33,8 @@ struct lsm6dsv16x {
     uint8_t fifo_bytes_pending;
     uint32_t time1;
     uint32_t time2;
+    uint8_t samples_per_read;
+    uint8_t *raw_buff;
     struct sensor_bulk sb;
 };
 
@@ -51,15 +52,6 @@ lsm6dsv16x_event(struct timer *timer)
     sched_wake_task(&lsm6dsv16x_wake);
     return SF_DONE;
 }
-
-void
-command_config_lsm6dsv16x(uint32_t *args)
-{
-    struct lsm6dsv16x *ax = oid_alloc(args[0], command_config_lsm6dsv16x, sizeof(*ax));
-    ax->timer.func = lsm6dsv16x_event;
-    ax->i2c = i2cdev_oid_lookup(args[1]);
-}
-DECL_COMMAND(command_config_lsm6dsv16x, "config_lsm6dsv16x oid=%c i2c_oid=%c");
 
 // Schedule collecting data from the accelerometer FIFO
 static void
@@ -113,17 +105,16 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
         return;
 
     // Read up to SAMPLES_PER_BLOCK words per task pass to keep I2C transactions short
-    uint8_t words_to_read = ax->unread_words >= SAMPLES_PER_BLOCK ? SAMPLES_PER_BLOCK : ax->unread_words;
+    uint8_t words_to_read = ax->unread_words >= ax->samples_per_read ? ax->samples_per_read : ax->unread_words;
     uint8_t reg_data = LSM6DSV16X_FIFO_DATA_OUT_TAG;
-    uint8_t raw_buf[SAMPLES_PER_BLOCK * BYTES_PER_FIFO_WORD];
     uint8_t read_bytes = words_to_read * BYTES_PER_FIFO_WORD;
 
-    if (i2c_dev_read(ax->i2c, 1, &reg_data, read_bytes, raw_buf) != 0)
+    if (i2c_dev_read(ax->i2c, 1, &reg_data, read_bytes, ax->raw_buf) != 0)
         return;
 
     // Strip the 1-byte FIFO tag and pack 6-byte XYZ samples into sensor_bulk
     for (uint8_t i = 0; i < words_to_read; i++) {
-        uint8_t *word = &raw_buf[i * BYTES_PER_FIFO_WORD];
+        uint8_t *word = &ax->raw_buf[i * BYTES_PER_FIFO_WORD];
         uint8_t sensor_tag = (word[0] >> 3) & 0x1F;
         if (sensor_tag == TAG_ACCEL_NC) {
             memcpy(&ax->sb.data[ax->sb.data_count], &word[1], BYTES_PER_SAMPLE);
@@ -134,13 +125,25 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     }
 
     // Reschedule immediately if more words remain in FIFO
-    if (ax->unread_words >= SAMPLES_PER_BLOCK) {
+    if (ax->unread_words >= SAMPLES_PER_READ) {
         sched_wake_task(&lsm6dsv16x_wake);
     } else {
         ax->flags &= ~LSM_PENDING;
         lsm6dsv16x_reschedule_timer(ax);
     }
 }
+
+void
+command_config_lsm6dsv16x(uint32_t *args)
+{
+    struct lsm6dsv16x *ax = oid_alloc(args[0], command_config_lsm6dsv16x, sizeof(*ax));
+    ax->timer.func = lsm6dsv16x_event;
+    ax->i2c = i2cdev_oid_lookup(args[1]);
+
+    ax->samples_per_read = args[2];
+    ax->raw_buff = malloc(ax->samples_per_read * BYTES_PER_FIFO_WORD);
+}
+DECL_COMMAND(command_config_lsm6dsv16x, "config_lsm6dsv16x oid=%c i2c_oid=%c samples=%c");
 
 void
 command_query_lsm6dsv16x(uint32_t *args)
@@ -151,6 +154,7 @@ command_query_lsm6dsv16x(uint32_t *args)
     ax->flags = 0;
     if (!args[1])
         // End measurements
+        free(ax->raw_buff);
         return;
 
     // Start new measurements query

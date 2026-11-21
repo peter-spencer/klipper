@@ -41,8 +41,9 @@ LSM6DSV16X_DATA_RATES = {
     100: 0x6, 200: 0x7, 400: 0x8, 800: 0x9, 1600: 0xA, 3200: 0xB, 6400: 0xC
 }
 
+LSM6DSV16X_HAODR_ENABLE = 0x10
 LSM6DSV16X_HAODR_CFGS = {
-    0: 0, 1.875: 0, 7.5: 0, 15: 0, 30: 0, 60: 0, 120: 0, 240: 0,
+    15: 0, 30: 0, 60: 0, 120: 0, 240: 0,
     480: 0, 960: 0, 1920: 0, 3840: 0, 7680: 0, 15.625: 1,
     31.25: 1, 62.5: 1, 125: 1, 250: 1, 500: 1, 1000: 1,
     2000: 1, 4000: 1, 8000: 1, 12.5: 2, 25: 2, 50: 2,
@@ -58,15 +59,27 @@ SCALE_4G = 0.000122 * FREEFALL_ACCEL
 
 BATCH_UPDATES = 0.100
 
+class LSM6DSV16XQueryHelper(adxl345.AccelQueryHelper):
+    def __init__(self, printer):
+        super().__init__(printer)
+
+    # Would be useful to process data tags here for different sensors
+    def get_samples(self):
+        return super().get_samples()
+
 class LSM6DSV16X:
     def __init__(self, config):
         self.last_error_count = 0
         self.printer = config.get_printer()
         adxl345.AccelCommandHelper(config, self)
         self.axes_map = adxl345.read_axes_map(config, SCALE_4G, SCALE_4G, SCALE_4G)
-        self.data_rate = config.getint('rate', 1600)
 
-        # Setup I2C (default 400 kHz, address 0x6A)
+        # Load settings from printer.cfg
+        self.data_rate = config.getint('rate', 1600)
+        self.samples_per_read = config.getint('samples_per_read', 16)
+        self.poll_interval = config.getfloat('poll_interval', 0.0025)
+
+        # Setup I2C
         self.i2c = bus.MCU_I2C_from_config(
             config, default_addr=LSM6DSV16X_ADDRESS, default_speed=400000
         )
@@ -75,7 +88,8 @@ class LSM6DSV16X:
         self.query_lsm6dsv16x_cmd = None
 
         mcu.add_config_cmd(
-            "config_lsm6dsv16x oid=%d i2c_oid=%d" % (oid, self.i2c.get_oid())
+            "config_lsm6dsv16x oid=%d i2c_oid=%d samples=%d" % (
+                oid, self.i2c.get_oid(), self.samples_per_read)
         )
         mcu.add_config_cmd(
             "query_lsm6dsv16x oid=%d rest_ticks=0" % (oid,), on_restart=True
@@ -108,38 +122,94 @@ class LSM6DSV16X:
         )
 
     def start_internal_client(self):
-        aqh = adxl345.AccelQueryHelper(self.printer)
+        aqh = LSM6DSV16XQueryHelper(self.printer)
         self.batch_bulk.add_client(aqh.handle_batch)
         return aqh
 
-    def _start_measurements(self):        
-        # Verify WHO_AM_I (0x0F) == 0x70
-        params = self.i2c.i2c_read([LSM6DSV16X_WHO_AM_I], 1)
-        if bytearray(params['response'])[0] != LSM6DSV16X_DEVICE_ID:
-            raise self.printer.command_error("Invalid LSM6DSV16X WHO_AM_I")
+    def read_reg(self, reg):
+        params = self.i2c.i2c_read([reg], 1)
+        return bytearray(params['response'])[0]
 
-        # Software reset & poll bit 0
-        self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x01])
+    def set_reg(self, reg, val, minclock=0):
+        self.bus.i2c_write([reg, val & 0xFF], minclock=minclock)
+        stored_val = self.read_reg(reg)
+        if stored_val != val:
+            raise self.printer.command_error(
+                    "Failed to set LSM6DSV16X register [0x%x] to 0x%x: got 0x%x. "
+                    "This is generally indicative of connection problems "
+                    "(e.g. faulty wiring) or a faulty lsm6dsv16x chip." % (
+                        reg, val, stored_val))
+
+    def is_device_id_correct(self, raise_exception=False):
+        reported_device_ID = self.read_reg(LSM6DSV16X_WHO_AM_I)
+        if raise_exception and reported_device_ID != LSM6DSV16X_DEVICE_ID:
+            raise self.printer.command_error("Invalid LSM6DSV16X device ID: got 0x%x "
+                    "instead of 0x%x." % (reported_device_ID, LSM6DSV16X_DEVICE_ID))
+        return reported_device_ID == LSM6DSV16X_DEVICE_ID
+
+    def reset(self):
+        # Software reset by setting bit 0 of CTRL3 to 1, and then waiting for it to reset to 0
+        self.set_reg(LSM6DSV16X_CTRL3, 0x01)
         reactor = self.printer.get_reactor()
         deadline = reactor.monotonic() + 0.100
-        while bytearray(self.i2c.i2c_read([LSM6DSV16X_CTRL3], 1)['response'])[0] & 0x01:
+        while self.read_reg(LSM6DSV16X_CTRL3) & 0x01:
             if reactor.monotonic() > deadline:
                 raise self.printer.command_error("LSM6DSV16X reset timeout")
             reactor.pause(reactor.monotonic() + 0.002)
 
-        # Configure BDU+IF_INC, +/-4g, FIFO continuous mode, 1.92 kHz ODR
-        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0]])  # Accelerometer powered down
-        self.i2c.i2c_write([LSM6DSV16X_HAODR_CFG, LSM6DSV16X_HAODR_CFGS[self.data_rate]])  # Set for high accuracy data rate if needed
-        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate]])  # Set accelerometer output data rate
-        self.i2c.i2c_write([LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0]])  # Gyroscope powered down
-        self.i2c.i2c_write([LSM6DSV16X_CTRL3, 0x44])  # Block data update and IF_INC enable
-        self.i2c.i2c_write([LSM6DSV16X_CTRL8, 0x01])  # Set full scale +/- 4g
-        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS']])  # FIFO_CTRL4: Bypass mode (flush)
-        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL3, LSM6DSV16X_DATA_RATES[self.data_rate]])  # FIFO_CTRL3: Accelerometer Batched Data Rate
-        self.i2c.i2c_write([LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['STREAM']])  # FIFO_CTRL4: Continuous mode
+        # Ensure that Block data updatea and register increments on multi-byte reads are enabled
+        self.i2c.set_reg(LSM6DSV16X_CTRL3, 0x44)  # They should be set by default
+
+    def set_accelerometer(self):
+        if self.data_rate in LSM6DSV16X_HAODR_CFGS:
+            # Enable High Accuracy Output Data Rate operation
+            self.i2c.set_reg(LSM6DSV16X_HAODR_CFG, LSM6DSV16X_HAODR_CFGS[self.data_rate])  # Set for high accuracy data rate if needed
+            self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate] | LSM6DSV16X_HAODR_ENABLE)
+        else:
+            # Enable High Performance operation
+            self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate])  # Set accelerometer output data rate
+
+    def stop_accelerometer(self):
+            self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0])
+    
+    def stop_gyro(self):
+            self.i2c.set_reg(LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0])
+    
+    def select_fifo_data(self, enable_accelerometer=True, enable_gyro=False):
+        if enable_accelerometer:
+            accelerometer_rate = LSM6DSV16X_DATA_RATES[self.data_rate]
+        else:
+            accelerometer_rate = LSM6DSV16X_DATA_RATES[0]
+        if enable_gyro:
+            gyro_rate = LSM6DSV16X_DATA_RATES[self.data_rate]
+        else:
+            gyro_rate = LSM6DSV16X_DATA_RATES[0]
+        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL3, accelerometer_rate | (gyro_rate << 4))
+
+    def start_fifo(self):
+        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['STREAM'])
+
+    def stop_fifo(self):
+        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS'])
+
+    def _start_measurements(self):
+        # Check the chip is present and reset it.
+        self.is_device_id_correct(raise_exception=True)
+        self.reset()
+
+        # Set the sensitivity of the accelerometer
+        self.i2c.set_reg(LSM6DSV16X_CTRL8, 0x01)  # Set full scale +/- 4g
+
+        # Start the accelerometer
+        self.set_accelerometer()
+        
+        # Setup the chip's FIFO buffer and start sending measurements to it
+        self.stop_fifo()
+        self.select_fifo_data()
+        self.start_fifo()
 
         # Start MCU timer polling every ~2.5 ms (5 samples at 1.92 kHz)
-        rest_ticks = self.mcu.seconds_to_clock(4.0 / self.data_rate)
+        rest_ticks = self.mcu.seconds_to_clock(self.poll_interval)
         self.query_lsm6dsv16x_cmd.send([self.oid, rest_ticks])
         self.ffreader.note_start()
         self.last_error_count = 0
@@ -147,7 +217,8 @@ class LSM6DSV16X:
     def _stop_measurements(self):
         self.query_lsm6dsv16x_cmd.send_wait_ack([self.oid, 0])
         self.ffreader.note_end()
-        self.i2c.i2c_write([LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0]])  # Power-down accelerometer
+        self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0])  # Power-down accelerometer
+        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS'])  # Bypass mode empties the FIFO buffer
 
     def _process_batch(self, eventtime):
         samples = self.ffreader.pull_samples()
