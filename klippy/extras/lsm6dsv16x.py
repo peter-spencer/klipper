@@ -167,22 +167,22 @@ class LSM6DSV16X:
             reactor.pause(reactor.monotonic() + 0.002)
 
         # Ensure that Block data updatea and register increments on multi-byte reads are enabled
-        self.i2c.set_reg(LSM6DSV16X_CTRL3, 0x44)  # They should be set by default
+        self.set_reg(LSM6DSV16X_CTRL3, 0x44)  # They should be set by default
 
     def set_accelerometer(self):
         if self.data_rate in LSM6DSV16X_HAODR_CFGS:
             # Enable High Accuracy Output Data Rate operation
-            self.i2c.set_reg(LSM6DSV16X_HAODR_CFG, LSM6DSV16X_HAODR_CFGS[self.data_rate])  # Set for high accuracy data rate if needed
-            self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate] | LSM6DSV16X_HAODR_ENABLE)
+            self.set_reg(LSM6DSV16X_HAODR_CFG, LSM6DSV16X_HAODR_CFGS[self.data_rate])  # Set for high accuracy data rate if needed
+            self.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate] | LSM6DSV16X_HAODR_ENABLE)
         else:
             # Enable High Performance operation
-            self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate])  # Set accelerometer output data rate
+            self.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[self.data_rate])  # Set accelerometer output data rate
 
     def stop_accelerometer(self):
-            self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0])
+            self.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0])
     
     def stop_gyro(self):
-            self.i2c.set_reg(LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0])
+            self.set_reg(LSM6DSV16X_CTRL2, LSM6DSV16X_DATA_RATES[0])
     
     def select_fifo_data(self, enable_accelerometer=True, enable_gyro=False):
         if enable_accelerometer:
@@ -193,13 +193,13 @@ class LSM6DSV16X:
             gyro_rate = LSM6DSV16X_DATA_RATES[self.data_rate]
         else:
             gyro_rate = LSM6DSV16X_DATA_RATES[0]
-        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL3, accelerometer_rate | (gyro_rate << 4))
+        self.set_reg(LSM6DSV16X_FIFO_CTRL3, accelerometer_rate | (gyro_rate << 4))
 
     def start_fifo(self):
-        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['STREAM'])
+        self.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['STREAM'])
 
     def stop_fifo(self):
-        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS'])
+        self.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS'])
 
     def _start_measurements(self):
         # Check the chip is present and reset it.
@@ -207,7 +207,7 @@ class LSM6DSV16X:
         self.reset()
 
         # Set the sensitivity of the accelerometer
-        self.i2c.set_reg(LSM6DSV16X_CTRL8, 0x01)  # Set full scale +/- 4g
+        self.set_reg(LSM6DSV16X_CTRL8, 0x01)  # Set full scale +/- 4g
 
         # Start the accelerometer
         self.set_accelerometer()
@@ -226,8 +226,8 @@ class LSM6DSV16X:
     def _stop_measurements(self):
         self.query_lsm6dsv16x_cmd.send_wait_ack([self.oid, 0])
         self.ffreader.note_end()
-        self.i2c.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0])  # Power-down accelerometer
-        self.i2c.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS'])  # Bypass mode empties the FIFO buffer
+        self.set_reg(LSM6DSV16X_CTRL1, LSM6DSV16X_DATA_RATES[0])  # Power-down accelerometer
+        self.set_reg(LSM6DSV16X_FIFO_CTRL4, LSM6DSV16X_MODE['BYPASS'])  # Bypass mode empties the FIFO buffer
 
     def _process_batch(self, eventtime):
         samples = self.ffreader.pull_samples()
