@@ -135,7 +135,7 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
 
     // Only query number of unread words if this is a new round of read-out passes.
     // Saves bandwidth on I2C bus and reduces time the Klipper MCU is blocked.
-    if(!final_flag && (ax->unread_words == 0)) {
+    if(!ax->final_flag && (ax->unread_words == 0)) {
         if(query_fifo_status(ax) != 0)
             return;
     }
