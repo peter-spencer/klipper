@@ -1,4 +1,5 @@
 // Support for reading acceleration data from LSM6DSV16X over I2C
+#include <stdlib.h>
 #include <string.h> // memcpy
 #include "basecmd.h" // oid_alloc
 #include "board/irq.h" // irq_disable
@@ -143,13 +144,13 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
     uint8_t read_bytes = words_to_read * BYTES_PER_FIFO_WORD;
 
     if (read_bytes > 0) {
-        if (i2c_dev_read(ax->i2c, 1, &reg_data, read_bytes, ax->raw_buf) != 0)
+        if (i2c_dev_read(ax->i2c, 1, &reg_data, read_bytes, ax->raw_buff) != 0)
             return;
     }
 
     // Strip the 1-byte FIFO tag and pack 6-byte XYZ samples into sensor_bulk
     for (uint8_t i = 0; i < words_to_read; i++) {
-        uint8_t *word = &ax->raw_buf[i * BYTES_PER_FIFO_WORD];
+        uint8_t *word = &ax->raw_buff[i * BYTES_PER_FIFO_WORD];
         sensor_tag = (word[0] >> 3) & 0x1F;
         switch (sensor_tag) {
             // Sensor hub
@@ -235,10 +236,11 @@ command_query_lsm6dsv16x(uint32_t *args)
 
     sched_del_timer(&ax->timer);
     ax->flags = 0;
-    if (!args[1])
+    if (!args[1]) {
         // End measurements
         free(ax->raw_buff);
         return;
+    }
 
     // Start new measurements query
     ax->rest_ticks = args[1];
