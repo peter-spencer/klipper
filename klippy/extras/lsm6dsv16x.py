@@ -139,7 +139,7 @@ class LSM6DSV16X:
         return bytearray(params['response'])[0]
 
     def set_reg(self, reg, val, minclock=0):
-        self.bus.i2c_write([reg, val & 0xFF], minclock=minclock)
+        self.i2c.i2c_write([reg, val & 0xFF], minclock=minclock)
         stored_val = self.read_reg(reg)
         if stored_val != val:
             raise self.printer.command_error(
