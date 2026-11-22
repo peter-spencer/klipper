@@ -4,7 +4,7 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
-import logging
+import logging, collections
 from . import bus, bulk_sensor, adxl345
 
 LSM6DSV16X_ADDRESS = 0x6B
@@ -59,9 +59,16 @@ SCALE_4G = 0.000122 * FREEFALL_ACCEL
 
 BATCH_UPDATES = 0.100
 
+Gyro_Measurement = collections.namedtuple(
+    'Gyro_Measurement', ('time', 'omega_p', 'omega_r', 'omega_y'))
+
 class LSM6DSV16XQueryHelper(adxl345.AccelQueryHelper):
     def __init__(self, printer):
         super().__init__(printer)
+
+        # Store readings to handle compressed samples
+        self.accel_history = [0, 0]
+        self.gyro_history = [0, 0]
 
     # Would be useful to process data tags here for different sensors
     def get_samples(self):
