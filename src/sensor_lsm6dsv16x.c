@@ -222,6 +222,7 @@ lsm6dsv16x_query(struct lsm6dsv16x *ax, uint8_t oid)
         ax->flags &= ~LSM_PENDING;
         lsm6dsv16x_reschedule_timer(ax);
     } else {
+        ax->final_flag = 0;
         sched_wake_task(&lsm6dsv16x_wake);
     }
 }
