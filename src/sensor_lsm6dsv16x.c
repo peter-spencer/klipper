@@ -1,5 +1,4 @@
 // Support for reading acceleration data from LSM6DSV16X over I2C
-#include <stdlib.h>
 #include <string.h> // memcpy
 #include "basecmd.h" // oid_alloc
 #include "board/irq.h" // irq_disable
@@ -225,7 +224,7 @@ command_config_lsm6dsv16x(uint32_t *args)
 
     ax->samples_per_read = args[2];
     ax->samples_over = args[3];
-    ax->raw_buff = malloc(ax->samples_per_read * BYTES_PER_FIFO_WORD);
+    ax->raw_buff = alloc_chunk(ax->samples_per_read * BYTES_PER_FIFO_WORD);
 }
 DECL_COMMAND(command_config_lsm6dsv16x, "config_lsm6dsv16x oid=%c i2c_oid=%c samples=%c over=%c");
 
@@ -238,7 +237,6 @@ command_query_lsm6dsv16x(uint32_t *args)
     ax->flags = 0;
     if (!args[1]) {
         // End measurements
-        free(ax->raw_buff);
         return;
     }
 
