@@ -84,6 +84,7 @@ class LSM6DSV16X:
         # Load settings from printer.cfg
         self.data_rate = config.getint('rate', 1600)
         self.samples_per_read = config.getint('samples_per_read', 16)
+        self.samples_over = config.getint('extra_samples_per_read', 4)
         self.poll_interval = config.getfloat('poll_interval', 0.0025)
 
         # Setup I2C
@@ -95,8 +96,8 @@ class LSM6DSV16X:
         self.query_lsm6dsv16x_cmd = None
 
         mcu.add_config_cmd(
-            "config_lsm6dsv16x oid=%d i2c_oid=%d samples=%d" % (
-                oid, self.i2c.get_oid(), self.samples_per_read)
+            "config_lsm6dsv16x oid=%d i2c_oid=%d samples=%d over=%d" % (
+                oid, self.i2c.get_oid(), self.samples_per_read, self.samples_over)
         )
         mcu.add_config_cmd(
             "query_lsm6dsv16x oid=%d rest_ticks=0" % (oid,), on_restart=True
