@@ -138,15 +138,16 @@ class LSM6DSV16X:
         params = self.i2c.i2c_read([reg], 1)
         return bytearray(params['response'])[0]
 
-    def set_reg(self, reg, val, minclock=0):
+    def set_reg(self, reg, val, minclock=0, verify=False):
         self.i2c.i2c_write([reg, val & 0xFF], minclock=minclock)
-        stored_val = self.read_reg(reg)
-        if stored_val != val:
-            raise self.printer.command_error(
-                    "Failed to set LSM6DSV16X register [0x%x] to 0x%x: got 0x%x. "
-                    "This is generally indicative of connection problems "
-                    "(e.g. faulty wiring) or a faulty lsm6dsv16x chip." % (
-                        reg, val, stored_val))
+        if verify:
+            stored_val = self.read_reg(reg)
+            if stored_val != val:
+                raise self.printer.command_error(
+                        "Failed to set LSM6DSV16X register [0x%x] to 0x%x: got 0x%x. "
+                        "This is generally indicative of connection problems "
+                        "(e.g. faulty wiring) or a faulty lsm6dsv16x chip." % (
+                            reg, val, stored_val))
 
     def is_device_id_correct(self, raise_exception=False):
         reported_device_ID = self.read_reg(LSM6DSV16X_WHO_AM_I)
